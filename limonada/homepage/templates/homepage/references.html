@@ -1,0 +1,153 @@
+{% extends "homepage/layout.html" %}
+
+{% load homepage_extras %}
+
+{% block title %}References{% endblock %}
+
+{% block description %}
+  references repository of limonada
+{% endblock %}
+
+{% block content %}
+
+  <!-- Title -->
+  <div class="row align-items-center justify-content-between">
+    <div class="col-auto"><h1>Articles</h1></div>
+    <div class="col-auto">
+      {% if user.is_authenticated %}
+        <a href="{% url 'refcreate' %}" class="btn btn-primary" role="button">Add</a>
+      {% endif %}
+    </div>
+  </div>
+  <br>
+
+  <!-- Search form -->
+  <div class="row justify-content-between bg-green rounded-top border border-bottom-0 border-success p-3 mx-1">
+    <div class="col-auto px-0">
+      {% include 'per_page.html' %}
+    </div>
+    <div id="collapseselect" class="col-12 col-md-auto order-last"
+         {% if not params.year %}style="display: none"{% endif %}>
+      <div class="container">
+        <form id="select_form" method="get">
+          <div class="row pt-1">
+            {% for field in form_select %}
+              <div class="col-0 p-1">{{ field.label_tag }}</div>
+              {% if field.name == 'author' %}<div class="col-5">{% else %}<div class="col-3">{% endif %}
+                {{ field }}
+                {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+                {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+              </div>
+            {% endfor %}
+            <div class="col-0 pt-1">
+              <a onclick="url_replace('author','year')" class="btn btn-primary btn-sm text-white">Select</a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="col-auto ml-auto order-md-last">
+      <h2 class="text-info" id="clickselect"><i id="iconselect" class="fas fa-plus"></i></h2>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="row align-items-center bg-white border border-top-0 border-bottom-0 border-success p-3 mx-1">
+    <div class="col-12 table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th class="w-15">
+              {% if sort == "refid" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="refid" dir="des" %}">Name</a>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="refid" dir="asc" %}">Name</a>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="refid" dir="asc" %}">Name</a>
+              {% endif %}
+            </th>
+            <th class="w-70">
+              {% if sort == "title" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="title" dir="des" %}">Title</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="title" dir="asc" %}">Title</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="title" dir="asc" %}">Title</a></th>
+              {% endif %}
+            <th class="w-5">
+              {% if sort == "year" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="year" dir="asc" %}">Year</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="year" dir="asc" %}">Year</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="year" dir="asc" %}">Year</a></th>
+              {% endif %}
+            {% if user.is_authenticated %}
+              <th class="w-10"></th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for ref in page_objects %}
+            <tr>
+              <td><a class="text-success" href="http://dx.doi.org/{{ ref.doi }}">{{ ref.refid }}</a></td>
+              <td>
+                <div id="{{ ref.refid }}">
+                  <a class="text-info" data-toggle="collapse" href="#collapse{{ ref.refid }}" aria-expanded="false"
+                      aria-controls="collapse{{ ref.refid }}">{{ ref.title }}</a>
+                  <div id="collapse{{ ref.refid }}" class="collapse" data-parent="#{{ ref.refid }}">
+                    {% for author in ref.authorslist_set.all|dictsort:"position" %}
+                      {{ author.author.fullname }}{% if not forloop.last %},{% endif %}
+                    {% endfor %}<br>
+                    <i>{{ ref.journal }}</i>, {{ ref.year }}, <i>{{ ref.volume }}</i>.
+                    <b>DOI:</b> <a class="text-success" href="http://dx.doi.org/{{ ref.doi }}">{{ ref.doi }}</a>
+                  </div>
+                </div>
+              </td>
+              <td>{{ ref.year }}</td>
+              {% if user.is_authenticated %}
+                {% if user == ref.curator %}
+                  <td class="text-right">
+                    <a href="{% url 'refupdate' ref.pk %}"><i class="fas fa-edit text-success"></i></a>
+                    <a href="{% url 'refdelete' ref.pk %}"><i class="fas fa-trash text-success"></i></a>&nbsp
+                  </td>
+                {% else %}
+                  <td class="text-right">
+                    <a href="{% url 'mail' %}?refid={{ ref.pk }}"><i class="fas fa-edit text-success"></i></a>
+                  </td>
+                {% endif %}
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="row align-items-start justify-content-between bg-green rounded-bottom border border-top-0
+              border-success p-3 mx-1">
+    {% include 'paginator.html' %}
+  </div>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    $("#select_form").submit(function(){url_replace('author','year')});
+  </script>
+  {{ form_select.media }}
+
+{% endblock %}

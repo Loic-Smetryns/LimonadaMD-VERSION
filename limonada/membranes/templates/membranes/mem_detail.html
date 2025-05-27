@@ -1,0 +1,315 @@
+{% extends "homepage/layout.html" %}
+
+{% load homepage_extras %}
+{% load membrane_extras %}
+
+{% block title %}Membranes{% endblock %}
+
+{% block content %}
+
+  <div class="row ml-3 mb-3">
+    <div class="row align-items-center">
+      <label class="font-weight-bold form-select">Versions</label>
+      <div class="ml-2 mr-2">
+        <select id="versions" name="versions" id="versions" class="custom-select">
+          {% for version in versions %}
+            <option value="{% url 'memdetail' version.pk %}" {% if membranetopol.pk == version.pk%}selected{% endif %} >{{ version.version }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if user.is_authenticated %}
+        {% if user == membranetopol.curator %}
+          <form method="post" action="{% url 'mem-new-version' membranetopol.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-primary" type="submit">Nouvelle Version</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row align-items-center justify-content-between">
+    <div class="col-auto"><h1>Membranes</h1></div>
+    <div class="col-auto">
+      {% if user.is_authenticated %}
+        <a href="{% url 'propcreate' %}" class="btn btn-primary" role="button">Add analysis</a>
+      {% endif %}
+    </div>
+  </div>
+  <br>
+
+  <p class="font-italic m-0 pl-1"><span class="font-weight-bold">N.B.:</span> If you use the following files in your
+      work, please cite the primary source. (see Description field)</p>
+  <div class="row bg-white border rounded border-success px-3 pt-3 mx-1">
+    <div class="col-12 col-lg-7 table-responsive">
+      <table class="table table-sm">
+        <tbody>
+          <tr><td class="font-weight-bold">Name:</td><td>{{ membranetopol.name }}</td></tr>
+          <tr>
+            <td class="font-weight-bold">Lipids:</td>
+            <td>
+              {% lipidnames membranetopol.topolcomposition_set.all as lipids %}
+              {% for lip in lipids %}
+                <a class="text-success" href="{% url 'lipdetail' lip.slug %}">
+                    {{ lip.name }}{% if not forloop.last %},{% endif %}</a>
+              {% endfor %}
+            </td>
+          </tr>
+          <tr>
+            <td class="font-weight-bold">Forcefield:</td>
+            <td>
+              <a class="text-success" href="{% url 'fflist' %}?ffid={{ membranetopol.forcefield.pk }}">
+                  {{ membranetopol.forcefield }}</a>
+            </td>
+          </tr>
+          <tr><td class="font-weight-bold">Software:</td><td>{{ membranetopol.software }}</td></tr>
+          <tr>
+            <td class="font-weight-bold">Files:</td>
+            <td>
+              {% if membranetopol.mem_file %}
+                <a href="{{ membranetopol.mem_file.url }}" class="text-success" target="blank">
+                    {{ membranetopol.mem_file.url|basename }}</a>,
+              {% endif %}
+              <a href="{{ membranetopol.compo_file.url }}" class="text-success" target="blank">
+                  {{ membranetopol.compo_file.url|basename }}</a><br>
+              {% if membranetopol.other_file %}
+                <a><i id="zip_toggle" class="text-success fas fa-chevron-circle-right icon-4x" data-toggle="collapse"
+                      data-target=".collapse-zip" aria-expanded="false" onclick="toggle(this.id)"></i></a>
+                <a href="{{ membranetopol.other_file.url }}" class="text-success" target="blank">
+                    Parameters and other files</a><br>
+                <div class="collapse collapse-zip p-0 m-0">
+                  {% for file in other_filelist %}
+                     <span class="text-secondary text-small px-4">{{ file }}</span><br>
+                  {% endfor %}
+                </div>
+              {% endif %}
+              {% for doi in membranetopol.doi.all %}
+                  <a class="text-success" href="http://dx.doi.org/{{ doi.doi }}" target="_blank">http://dx.doi.org/{{ doi.doi }}</a>
+                  <br>
+              {% endfor %}
+              <a href="{% url 'getfiles' %}?memid={{ membranetopol.pk }}" class="text-success">Simulation files</a>
+            </td>
+          </tr>
+          <tr><td class="font-weight-bold">Number:</td><td>{{ membranetopol.nb_lipids }} lipids</td></tr>
+          <tr><td class="font-weight-bold">Temperature:</td><td>{{ membranetopol.temperature }} °K</td></tr>
+          <tr><td class="font-weight-bold">Equilibration:</td><td>{{ membranetopol.equilibration }} ns</td></tr>
+          <tr><td class="font-weight-bold">Tags:</td><td>{{ membranetopol.membrane.tag.all|join:", " }}</td></tr>
+          <tr><td class="font-weight-bold">Proteins:</td><td>{{ membranetopol.prot.all|join:", " }}</td></tr>
+          {% if prop %}
+            <tr>
+              <td class="font-weight-bold">Analysis:</td>
+              <td>
+                <a class="text-success" href="{% url 'proplist' %}?propid={{ prop }}">Membrane computed properties</a><br>
+              </td>
+            </tr>
+          {% endif %}
+          <tr>
+            <td><strong>Description:</strong></td>
+            <td>{{ membranetopol.description|linebreaks|urlize }}</td>
+          </tr>
+          <tr>
+            <td><strong>References:</strong></td>
+            <td>
+              {% for reference in membranetopol.reference.all %}
+                <a class="text-success" href="http://dx.doi.org/{{ reference.doi }}">{{ reference.refid }}</a>
+                <i>{{ reference.journal }}</i>, {{ reference.volume }}.
+                {{ reference.title }}<br>
+              {% endfor %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col-12 col-lg-5 align-self-center">
+      <div id="viewport" class="viewport-mem"></div>
+    </div>
+    <div class="col-12 col-md-2 font-weight-bold">Composition:</div>
+    <div class="col-6 col-md-4 ml-3">
+      <span class="font-weight-bold">Upper leaflet 1</span><br>
+      {% for lipid in membranetopol.topolcomposition_set.all|dictsortreversed:"number" %}
+        {% if lipid.side == "UP" %}
+          {% get_percent nblip "UP" lipid.number as percent %}
+          {{lipid.number}}
+          <a class="text-success" href="{% url 'lipdetail' lipid.topology.lipid.slug %}">
+              {{lipid.topology.lipid.name}}</a>
+          (<a class="text-success" href="{% url 'toplist' %}?topid={{lipid.topology.pk}}">{{lipid.topology.version}}</a>)
+          <small class="text-secondary">({{ percent }}%)</small>
+          <br>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div class="col-6 col-md-5 ml-3">
+      <span class="font-weight-bold">Lower leaflet 1</span><br>
+      {% for lipid in membranetopol.topolcomposition_set.all|dictsortreversed:"number" %}
+        {% if lipid.side == "LO" %}
+          {% get_percent nblip "LO" lipid.number as percent %}
+          {{lipid.number}}
+          <a class="text-success" href="{% url 'lipdetail' lipid.topology.lipid.slug %}">
+              {{lipid.topology.lipid.name}}</a>
+          (<a class="text-success" href="{% url 'toplist' %}?topid={{lipid.topology.pk}}">{{lipid.topology.version}}</a>)
+          <small class="text-secondary">({{ percent }}%)</small>
+          <br>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% for i in 15|times %}
+      <div class="col-12 col-md-2"></div>
+      <div class="col-6 col-md-4 ml-3">
+        {% with y=forloop.counter|stringformat:"s" %}
+        {% with bool=1 %}
+        {% for lipid in membranetopol.topolcomposition_set.all|dictsortreversed:"number" %}
+          {% if lipid.side == "UP"|add:y %}
+            {% get_percent nblip "UP"|add:y lipid.number as percent %}
+            {% if bool %}
+              {% boolean bool as bool %}
+              <br>
+              <span class="font-weight-bold">Upper leaflet {{y}}</span><br>
+            {% endif %}
+            {{lipid.number}}
+            <a class="text-success" href="{% url 'lipdetail' lipid.topology.lipid.slug %}">
+                {{lipid.topology.lipid.name}}</a>
+            (<a class="text-success" href="{% url 'toplist' %}?topid={{lipid.topology.pk}}">{{lipid.topology.version}}</a>)
+            <small class="text-secondary">({{ percent }}%)</small>
+            <br>
+          {% endif %}
+        {% endfor %}
+        {% endwith %}
+        {% endwith %}
+      </div>
+      <div class="col-6 col-md-5 ml-3">
+        {% with y=forloop.counter|stringformat:"s" %}
+        {% with bool=1 %}
+        {% for lipid in membranetopol.topolcomposition_set.all|dictsortreversed:"number" %}
+          {% if lipid.side == "LO"|add:y %}
+            {% get_percent nblip "LO"|add:y lipid.number as percent %}
+            {% if bool %}
+              {% boolean bool as bool %}
+              <br>
+              <span class="font-weight-bold">Lower leaflet {{y}}</span><br>
+            {% endif %}
+            {{lipid.number}}
+            <a class="text-success" href="{% url 'lipdetail' lipid.topology.lipid.slug %}">
+                {{lipid.topology.lipid.name}}</a>
+            (<a class="text-success" href="{% url 'toplist' %}?topid={{lipid.topology.pk}}">{{lipid.topology.version}}</a>)
+            <small class="text-secondary">({{ percent }}%)</small>
+            <br>
+          {% endif %}
+        {% endfor %}
+        {% endwith %}
+        {% endwith %}
+      </div>
+    {% endfor %}
+    <div class="col-12 col-md-2"></div>
+    <div class="col-6 col-md-4 ml-3">
+      {% with bool=1 %}
+      {% for lipid in membranetopol.topolcomposition_set.all|dictsortreversed:"number" %}
+        {% if lipid.side == "UNK" %}
+          {% if bool %}
+            {% boolean bool as bool %}
+            <br>
+            <span class="font-weight-bold">Not in leaflet</span><br>
+          {% endif %}
+          {{lipid.number}}
+          <a class="text-success" href="{% url 'lipdetail' lipid.topology.lipid.slug %}">
+              {{lipid.topology.lipid.name}}</a>
+          (<a class="text-success" href="{% url 'toplist' %}?topid={{lipid.topology.pk}}">{{lipid.topology.version}}</a>)
+          <br>
+        {% endif %}
+      {% endfor %}
+      {% endwith %}
+    </div>
+    <div class="col-6 p-3">
+      {% if user.is_authenticated %}
+        {% if user == membranetopol.curator %}
+          <a href="{% url 'memupdate' membranetopol.pk %}"><i class="fas fa-edit text-success"></i></a>
+          &nbsp
+          <a href="{% url 'memdelete' membranetopol.pk %}"><i class="fas fa-trash text-success"></i></a>
+        {% else %}
+          <a href="{% url 'mail' %}?memid={{ membranetopol.pk }}"><i class="fas fa-edit text-success"></i></a>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="col-auto ml-auto align-self-end">
+      <small>
+        <b>Curator:</b>
+        <a class="text-success" href="{% url 'userdetail' membranetopol.curator.pk %}">
+            {{ membranetopol.curator.get_full_name }}</a> on {{ membranetopol.date }}
+      </small>
+    </div>
+  </div>
+  <br>
+
+  <h2>Comments</h2>
+  <div class="row bg-white border rounded border-success p-3 mx-1">
+    <div class="col-12 comments">
+      {% for comment in comments %}
+        {{ comment.comment }}<br>
+        <p class="text-right p-0"><small class="text-secondary">{{ comment.user.get_full_name }} on {{ comment.date }}</small><p>
+        {% if not forloop.last %}<hr>{% endif %}
+      {% endfor %}
+      {% if comments|length == 0 %}
+        No comments yet<br>
+      {% endif %}
+    </div>
+    {% if user.is_authenticated %}
+      <form method="post">
+        {% csrf_token %}
+        <div class="col-12 pt-2">
+          <textarea id="{{ form.comment.id_for_label }}" name="{{ form.comment.html_name }}" class="form-control bg-light" rows="2" cols="110"></textarea>
+          {% if form.comment.help_text %}<small class="text-secondary">{{ form.comment.help_text }}<br></small>{% endif %}
+          {% for error in form.comment.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+          <button type="submit" class="btn btn-primary btn-sm mt-2">Add</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+  <br>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    window.addEventListener('load', (event) => {
+      document.getElementById('versions').addEventListener('change', (event) => {
+        window.location.href = event.target.value;
+      }); // La parenthèse fermante et le point-virgule étaient mal placés
+    });
+
+    $(document).ready(function(){
+      $(".comments").scrollTop($(".comments")[0].scrollHeight);
+    });
+    var mem_file = "{{ mem_file }}";
+    if (mem_file) {
+      var name = "{{ mem_file|basename }}";
+      var data = "../..{{ mem_file|dirname }}/";
+      var rep = "{{ rep }}"
+      NGL.DatasourceRegistry.add("data", new NGL.StaticDatasource(data))
+      var stage;
+      document.addEventListener("DOMContentLoaded", function () {
+        stage = new NGL.Stage('viewport')
+        // Handle window resizing
+        window.addEventListener( "resize", function( event ){
+          stage.handleResize();
+        }, false );
+        stage.loadFile("data://"+name).then(function (o) {
+          var e = new NGL.Euler( 4.71, 0, 0 );
+          var q = new NGL.Quaternion().setFromEuler( e );
+          o.setRotation( q );
+          o.addRepresentation(rep)
+          o.autoView()
+        })
+      })
+    }
+    /*function toggle(id) {
+      var x = document.getElementById(id);
+      if (x.innerHTML === "<i class='fas fa-chevron-circle-left'></i>") {
+        x.innerHTML = "<i class='fas fa-chevron-circle-down'></i>";
+      } else {
+        x.innerHTML = "<i class='fas fa-chevron-circle-left'></i>";
+      }
+    };*/
+  </script>
+
+{% endblock %}

@@ -1,0 +1,305 @@
+{% extends "homepage/layout.html" %}
+
+{% load homepage_extras %}
+{% load lipid_extras %}
+
+{% block title %}Lipids{% endblock %}
+
+{% block description %}
+  lipid repository of limonada
+{% endblock %}
+
+{% block content %}
+
+  <!-- Title -->
+  <div class="row align-items-center justify-content-between">
+    <div class="col-auto"><h1>Lipids</h1></div>
+    <div class="col-auto">
+      {% if user.is_authenticated %}
+        <a href="{% url 'lipcreate' %}" class="btn btn-primary" role="button">Add</a>
+      {% endif %}
+    </div>
+  </div>
+  <br>
+
+  <!-- Search form -->
+  <div class="row justify-content-between bg-green rounded-top border border-bottom-0 border-success p-3 mx-1">
+    <div class="col-auto px-0">
+      {% include 'per_page.html' %}
+    </div>
+    <div id="collapseselect" class="col-12 col-xl-9 col-lg-8 order-last"
+         {% if not params.category and not params.lipidid %}style="display: none"{% endif %}>
+      <div class="container">
+        <form id="select_form" method="get">
+          {% for field in form_select %}
+            <div class="row pt-1">
+              <div class="col-4 col-lg-2 col-md-2 col-sm-3 pt-1">
+                {% if field.name == 'main_class' %}
+                  <label id="{{ field.id_for_label }}_label" for="{{ field.id_for_label }}"
+                         {% if not params.category %}style="display: none;"{% endif %}>Main Class:</label>
+                {% elif field.name == 'sub_class' %}
+                  <label id="{{ field.id_for_label }}_label" for="{{ field.id_for_label }}"
+                         {% if not params.main_class %}
+                           style="display: none;"
+                         {% else %}
+                           {% lm_select params.main_class as lmobjects %}
+                           {% if not lmobjects %}style="display: none;"{% endif %}
+                         {% endif %}>Sub Class:</label>
+                {% elif field.name == 'l4_class' %}
+                  <label id="{{ field.id_for_label }}_label" for="{{ field.id_for_label }}"
+                         {% if not params.sub_class %}
+                           style="display: none;"
+                         {% else %}
+                           {% lm_select params.sub_class as lmobjects %}
+                           {% if not lmobjects %}style="display: none;"{% endif %}
+                         {% endif %}>Class Level 4:</label>
+                {% else %}
+                  {{ field.label_tag }}
+                {% endif %}
+              </div>
+              <div class="col-8 col-xl-8 col-lg-9 col-md-8 col-sm-9">
+                {% if field.name == 'category' %}
+                  <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control py-1"
+                          onchange="updateselect(this.id);">
+                  <option value="">---------</option>
+                  {% lm_select "category" as lmobjects %}
+                  {% for value,name in lmobjects %}
+                    <option value="{{ value }}" {% if value == params.category %}selected="selected"{% endif %}>
+                      {{ name }}
+                    </option>
+                  {% endfor %}
+                  </select>
+                {% elif field.name == 'main_class' %}
+                  <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control"
+                          {% if not params.category %}style="display: none;"{% endif %}
+                          onchange="updateselect(this.id)">
+                  <option value="">---------</option>
+                  {% if params.category %}
+                    {% lm_select params.category as lmobjects %}
+                    {% for value,name in lmobjects %}
+                      <option value="{{ value }}"
+                              {% if value == params.main_class %}selected="selected"{% endif %}>
+                        {{ name }}
+                      </option>
+                    {% endfor %}
+                  {% endif %}
+                  </select>
+                {% elif field.name == 'sub_class' %}
+                  <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control"
+                          {% if not params.main_class %}
+                             style="display: none;"
+                          {% else %}
+                            {% lm_select params.main_class as lmobjects %}
+                            {% if not lmobjects %}
+                                style="display: none;"
+                            {% endif %}
+                          {% endif %}
+                          onchange="updateselect(this.id)">
+                  <option value="">---------</option>
+                  {% if params.main_class %}
+                    {% lm_select params.main_class as lmobjects %}
+                    {% for value,name in lmobjects %}
+                      <option value="{{ value }}" {% if value == params.sub_class %}selected="selected"{% endif %}>
+                        {{ name }}
+                      </option>
+                    {% endfor %}
+                  {% endif %}
+                  </select>
+                {% elif field.name == 'l4_class' %}
+                  <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control"
+                          {% if not params.sub_class %}
+                            style="display: none;"
+                          {% else %}
+                            {% lm_select params.sub_class as lmobjects %}
+                            {% if not lmobjects %}
+                                style="display: none;"
+                            {% endif %}
+                          {% endif %}>
+                  <option value="">---------</option>
+                  {% if params.sub_class %}
+                    {% lm_select params.sub_class as lmobjects %}
+                    {% for value,name in lmobjects %}
+                      <option value="{{ value }}" {% if value == params.l4_class %}selected="selected"{% endif %}>
+                        {{ name }}
+                      </option>
+                    {% endfor %}
+                  {% endif %}
+                  </select>
+                {% else %}
+                  {{ field }}
+                {% endif %}
+                {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+                {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+          <a onclick="url_replace('lipidid','category','main_class','sub_class','l4_class')"
+             class="btn btn-primary btn-sm text-white">Select</a>
+        </form>
+      </div>
+    </div>
+    <div class="col-auto ml-auto order-lg-last">
+      <h2 class="text-info" id="clickselect"><i id="iconselect" class="fas fa-plus"></i></h2>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="row align-items-center bg-white border border-top-0 border-bottom-0 border-success p-3 mx-1">
+    <div class="col-12 table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th class="w-10">
+              {% if sort == "name" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="name" dir="des" %}">Name</a>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="name" dir="asc" %}">Name</a>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="name" dir="asc" %}">Name</a>
+              {% endif %}
+            </th>
+            <th class="w-15">
+              {% if sort == "lmid" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="lmid" dir="des" %}">LipidMaps ID</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="lmid" dir="asc" %}">LipidMaps ID</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="lmid" dir="asc" %}">LipidMaps ID</a></th>
+              {% endif %}
+            <th class="w-25">
+              {% if sort == "com_name" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="com_name" dir="des" %}">Common Name</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="com_name" dir="asc" %}">Common Name</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="com_name" dir="asc" %}">Common Name</a></th>
+              {% endif %}
+            <th class="w-40">
+              {% if sort == "sys_name" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="sys_name" dir="des" %}">Systematic Name</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="sys_name" dir="asc" %}">Systematic Name</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="sys_name" dir="asc" %}">Systematic Name</a></th>
+              {% endif %}
+            {% if user.is_authenticated %}
+              <th class="w-10"></th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for lipid in page_objects %}
+            <tr>
+              <td><a class="text-success" href="{% url 'lipdetail' lipid.slug %}">{{ lipid.name }}</a></td>
+              {% if lipid.lmid|substring:"0,2" == "LM" %}
+                <td>
+                  <a class="text-success" href="http://lipidmaps.org/data/LMSDRecord.php?LMID={{ lipid.lmid }}">
+                      {{ lipid.lmid }}</a>
+                </td>
+              {% else %}
+                <td>{{ lipid.lmid }}</td>
+              {% endif %}
+              <td>{{ lipid.com_name|slashbreak|safe }}</td>
+              <td>{{ lipid.sys_name }}</td>
+              {% if user.is_authenticated %}
+                {% if user == lipid.curator %}
+                  <td class="text-right">
+                    <a href="{% url 'lipupdate' lipid.slug %}"><i class="fas fa-edit text-success"></i></a>
+                    <a href="{% url 'lipdelete' lipid.slug %}"><i class="fas fa-trash text-success"></i></a>&nbsp
+                  </td>
+                {% else %}
+                  <td class="text-right">
+                    <a href="{% url 'mail' %}?lipid={{ lipid.pk }}"><i class="fas fa-edit text-success"></i></a>
+                  </td>
+                {% endif %}
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="row align-items-start justify-content-between bg-green rounded-bottom border border-top-0
+              border-success p-3 mx-1">
+    {% include 'paginator.html' %}
+  </div>
+  <br>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    function updateselect(s0){
+      var val = document.getElementById(s0).value;
+      if (s0 == 'id_category') {
+          var s1 = document.getElementById('id_main_class');
+          var s1_id = '#id_main_class';
+          var s1_label = '#id_main_class_label';
+          rmselect('id_main_class');
+          rmselect('id_sub_class');
+          rmselect('id_l4_class');
+      } else if (s0 == 'id_main_class') {
+          var s1 = document.getElementById('id_sub_class');
+          var s1_id = '#id_sub_class';
+          var s1_label = '#id_sub_class_label';
+          rmselect('id_sub_class');
+          rmselect('id_l4_class');
+      } else if (s0 == 'id_sub_class') {
+          var s1 = document.getElementById('id_l4_class');
+          var s1_id = '#id_l4_class';
+          var s1_label = '#id_l4_class_label';
+          rmselect('id_l4_class');
+      }
+      $.ajax({
+        url: '{% url "load_lmclass" %}',
+        data: { 'classname': val },
+        dataType: 'json',
+        success: function (data) {
+          if (data.length > 0) {
+            for (var i = 0; i < data.length; i++) {
+              $(s1).append('<option value='+ data[i].name +'>'+ data[i].line +'</option>');
+            };
+	        $(s1_id).css("display","block")
+	        $(s1_label).css("display","block")
+          } else {
+	        $(s1_id).css("display","none")
+	        $(s1_label).css("display","none")
+          }
+        }
+      });
+    }
+    function rmselect(s1){
+      var label = s1+"_label";
+      var s1  = document.getElementById(s1);
+      while (s1.options.length > 0) {
+        s1.remove(0);
+      }
+      var newOption = document.createElement("option");
+      newOption.value = "";
+      newOption.innerHTML = "---------";
+      s1.options.add(newOption);
+      s1.style.display = 'none'
+      document.getElementById(label).style.display = 'none';
+    }
+  </script>
+  {{ form_select.media }}
+
+{% endblock %}

@@ -1,0 +1,453 @@
+{% extends "homepage/layout.html" %}
+
+{% load forcefield_extras %}
+{% load homepage_extras %}
+{% load lipid_extras %}
+
+{% block title %}Topologies{% endblock %}
+
+{% block description %}
+  molecular dynamics lipid topologies repository of limonada
+{% endblock %}
+
+{% block content %}
+
+  <!-- Title -->
+  <div class="row align-items-center justify-content-between">
+    <div class="col-auto"><h1>Topologies</h1></div>
+    <div class="col-auto">
+      {% if user.is_authenticated %}
+        <a href="{% url 'topcreate' %}" class="btn btn-primary" role="button">Add</a>
+      {% endif %}
+    </div>
+  </div>
+  <br>
+
+  <!-- Search form -->
+  <p class="font-italic m-0 pl-1"><span class="font-weight-bold">N.B.:</span> If you use the following files in your
+      work, please cite the primary source. (see Description field)</p>
+  <div class="row justify-content-between bg-green rounded-top border border-bottom-0 border-success p-3 mx-1">
+    <div class="col-auto px-0">
+        {% include 'per_page.html' %}
+    </div>
+    <div id="collapseselect" class="col-12 col-xl-9 col-lg-8 order-last"
+         {% if not params.software and not params.category and not params.lipid and not params.altname %}style="display: none"{% endif %}>
+      <div class="container">
+        <form id="select_form" method="get">
+          {% csrf_token %}
+          <div class="row pt-1">
+            {% for field in form_select %}
+              {% if field.name == 'software' or field.name == 'softversion' or field.name == 'forcefield' %}
+                <div class="col-auto d-flex">
+                  <div class="pr-2 py-1">{{ field.label_tag }}</div>
+                  <div>
+                    {% if field.name == 'softversion' %}
+                      <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control">
+                      {% if params.software %}
+                        {% sv_select params.software as svobjects %}
+                      {% endif %}
+                      <option value="">---------</option>
+                      {% if svobjects %}
+                        {% for value,name in svobjects %}
+                          <option value="{{ value }}"
+                                  {% if value|slugify == params.softversion %}selected="selected"{% endif %}>
+                            {{ name }}
+                          </option>
+                        {% endfor %}
+                      {% endif %}
+                      </select>
+                    {% elif field.name == 'forcefield' %}
+                      <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control">
+                      {% if params.softversion %}
+		                {% ff_select params.software params.softversion as ffobjects %}
+                      {% elif params.software %}
+                        {% ff_select params.software "" as ffobjects %}
+                      {% endif %}
+                      <option value="">---------</option>
+                      {% if ffobjects %}
+                        {% for value,name in ffobjects %}
+                          <option value="{{ value }}"
+                                  {% if value|slugify == params.forcefield %}selected="selected"{% endif %}>
+                            {{ name }}
+                          </option>
+                        {% endfor %}
+                      {% endif %}
+                      </select>
+                    {% else %}
+                      {{ field }}
+                    {% endif %}
+                    {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+                    {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% for field in form_select %}
+            <div class="row pt-1">
+              {% if field.name == 'lipid' %}
+                <div class="col-4 col-lg-2 col-md-2 col-sm-3 pt-1">{{ field.label_tag }}</div>
+                <div class="col-8 col-xl-8 col-lg-9 col-md-8 col-sm-9 pb-1">
+                  {{ field }}
+                  {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+                  {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+                </div>
+              {% elif field.name == 'altname' %}
+                <div class="col-4 col-lg-4 col-md-4 col-sm-4 pt-1">{{ field.label_tag }}
+                    <span data-toggle="popover" data-trigger="hover" title="Alternative lipid name"
+                          data-content="Some lipids have been renamed in LIMONADA. This is because their names in the original
+                              forcefield is not 4 character long or because they are defined by different names accross forcfefields.
+                              When a lipid has been renamed, its original name should be specified in the description and this
+                              field enables to search for these names.">
+                        <i class="fas fa-info-circle text-success"></i></span>
+                </div>
+                <div class="col-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 pb-1">
+                  {{ field }}
+                  {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+                  {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+                </div>
+              {% elif field.name != 'software' and field.name != 'softversion' and field.name != 'forcefield' and field.name != 'altname' %}
+                <div class="col-4 col-lg-2 col-md-2 col-sm-3 pt-1">
+                  {% if field.name == 'main_class' %}
+                    <label id="{{ field.id_for_label }}_label" for="{{ field.id_for_label }}"
+                           {% if not params.category %}style="display: none;"{% endif %}>Main Class:</label>
+                  {% elif field.name == 'sub_class' %}
+                    <label id="{{ field.id_for_label }}_label" for="{{ field.id_for_label }}"
+                           {% if not params.main_class %}
+                             style="display: none;"
+                           {% else %}
+                             {% lm_select params.main_class as lmobjects %}
+                             {% if not lmobjects %}style="display: none;"{% endif %}
+                           {% endif %}>Sub Class:</label>
+                  {% elif field.name == 'l4_class' %}
+                    <label id="{{ field.id_for_label }}_label" for="{{ field.id_for_label }}"
+                           {% if not params.sub_class %}
+                             style="display: none;"
+                           {% else %}
+                             {% lm_select params.sub_class as lmobjects %}
+                             {% if not lmobjects %}style="display: none;"{% endif %}
+                           {% endif %}>Class Level 4:</label>
+                  {% else %}
+                    {{ field.label_tag }}
+                  {% endif %}
+                </div>
+                <div class="col-8 col-xl-8 col-lg-9 col-md-8 col-sm-9">
+                  {% if field.name == 'category' %}
+                    <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control py-1"
+                            onchange="updateselect(this.id);">
+                    <option value="">---------</option>
+                    {% lm_select "category" as lmobjects %}
+                    {% for value,name in lmobjects %}
+                      <option value="{{ value }}" {% if value == params.category %}selected="selected"{% endif %}>
+                        {{ name }}
+                      </option>
+                    {% endfor %}
+                    </select>
+                  {% elif field.name == 'main_class' %}
+                    <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control"
+                            {% if not params.category %}style="display: none;"{% endif %}
+                            onchange="updateselect(this.id)">
+                    <option value="">---------</option>
+                    {% if params.category %}
+                      {% lm_select params.category as lmobjects %}
+                      {% for value,name in lmobjects %}
+                        <option value="{{ value }}"
+                                {% if value == params.main_class %}selected="selected"{% endif %}>
+                          {{ name }}
+                        </option>
+                      {% endfor %}
+                    {% endif %}
+                    </select>
+                  {% elif field.name == 'sub_class' %}
+                    <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control"
+                            {% if not params.main_class %}
+                               style="display: none;"
+                            {% else %}
+                              {% lm_select params.main_class as lmobjects %}
+                              {% if not lmobjects %}
+                                  style="display: none;"
+                              {% endif %}
+                            {% endif %}
+                            onchange="updateselect(this.id)">
+                    <option value="">---------</option>
+                    {% if params.main_class %}
+                      {% lm_select params.main_class as lmobjects %}
+                      {% for value,name in lmobjects %}
+                        <option value="{{ value }}" {% if value == params.sub_class %}selected="selected"{% endif %}>
+                          {{ name }}
+                        </option>
+                      {% endfor %}
+                    {% endif %}
+                    </select>
+                  {% elif field.name == 'l4_class' %}
+                    <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control"
+                            {% if not params.sub_class %}
+                              style="display: none;"
+                            {% else %}
+                              {% lm_select params.sub_class as lmobjects %}
+                              {% if not lmobjects %}
+                                  style="display: none;"
+                              {% endif %}
+                            {% endif %}>
+                    <option value="">---------</option>
+                    {% if params.sub_class %}
+                      {% lm_select params.sub_class as lmobjects %}
+                      {% for value,name in lmobjects %}
+                        <option value="{{ value }}" {% if value == params.l4_class %}selected="selected"{% endif %}>
+                          {{ name }}
+                        </option>
+                      {% endfor %}
+                    {% endif %}
+                    </select>
+                  {% else %}
+                    {{ field }}
+                  {% endif %}
+                  {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+                  {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+          <a onclick="url_replace('software', 'softversion','forcefield','lipid','altname','category','main_class','sub_class','l4_class')"
+             class="btn btn-primary btn-sm text-white">Select</a>
+        </form>
+      </div>
+    </div>
+    <div class="col-auto ml-auto order-lg-last">
+      <h2 class="text-info" id="clickselect"><i id="iconselect" class="fas fa-plus"></i></h2>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="row align-items-center bg-white border border-top-0 border-bottom-0 border-success p-3 mx-1">
+    <div class="col-12 table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th class="w-15">
+              {% if sort == "version" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="version" dir="des" %}">Name</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="version" dir="asc" %}">Name</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="version" dir="asc" %}">Name</a></th>
+              {% endif %}
+            <th class="w-15">
+              {% if sort == "forcefield" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="forcefield" dir="des" %}">Forcefield</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="forcefield" dir="asc" %}">Forcefield</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="forcefield" dir="asc" %}">Forcefield</a></th>
+              {% endif %}
+            <th class="w-25">
+              {% if sort == "lipid" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="lipid" dir="des" %}">Lipid</a></th>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="lipid" dir="asc" %}">Lipid</a></th>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="lipid" dir="asc" %}">Lipid</a></th>
+              {% endif %}
+            <th class="w-15">Software</th>
+            <th class="w-20">Files</th>
+            {% if user.is_authenticated %}
+              <th class="w-10"></th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for topology in page_objects %}
+            <tr>
+              <td id="{{ topology.pk }}">
+                <a class="text-success" href="{% url 'topdetail' topology.pk %}">
+                    {{ topology.version }}_{{ topology.lipid.name }}</a>
+              </td>
+              <td>
+                <a class="text-success" href="{% url 'fflist' %}?ffid={{ topology.forcefield.pk }}">
+                    {{ topology.forcefield }}</a>
+              </td>
+              <td>
+                <a class="text-success" href="{% url 'lipdetail' topology.lipid.slug %}">
+                    {{ topology.lipid.name }} - {{ topology.lipid.com_name|slashbreak|safe }}</a>
+              </td>
+              <td>{% with topology.software.all|first as soft %}{{ soft.name }}{% endwith %}</td>
+              <td>
+                <a href="{{ topology.gro_file.url }}" class="text-success" target="blank">
+                    {{ topology.gro_file.url|basename }}</a>,
+                <a href="{{ topology.itp_file.url }}" class="text-success" target="blank">
+                    {{ topology.itp_file.url|basename }}</a>
+              </td>
+              {% if user.is_authenticated %}
+                {% if user == topology.curator %}
+                  <td class="text-right">
+                    <a href="{% url 'topupdate' topology.pk %}"><i class="fas fa-edit text-success"></i></a>
+                    <a href="{% url 'topdelete' topology.pk %}"><i class="fas fa-trash text-success"></i></a>&nbsp
+                  </td>
+                {% else %}
+                  <td class="text-right">
+                    <a href="{% url 'mail' %}?topid={{ topology.pk }}"><i class="fas fa-edit text-success"></i></a>
+                  </td>
+                {% endif %}
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="row align-items-start justify-content-between bg-green rounded-bottom border border-top-0 border-success p-3 mx-1">
+    {% include 'paginator.html' %}
+  </div>
+  <br>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+    function csrfSafeMethod(method) {
+        // these HTTP methods do not require CSRF protection
+        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+            // if not safe, set csrftoken
+            if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+    });
+    function updateselect(s0){
+      var val = document.getElementById(s0).value;
+      if (s0 == 'id_category') {
+          var s1 = document.getElementById('id_main_class');
+          var s1_id = '#id_main_class';
+          var s1_label = '#id_main_class_label';
+          rmselect('id_main_class');
+          rmselect('id_sub_class');
+          rmselect('id_l4_class');
+      } else if (s0 == 'id_main_class') {
+          var s1 = document.getElementById('id_sub_class');
+          var s1_id = '#id_sub_class';
+          var s1_label = '#id_sub_class_label';
+          rmselect('id_sub_class');
+          rmselect('id_l4_class');
+      } else if (s0 == 'id_sub_class') {
+          var s1 = document.getElementById('id_l4_class');
+          var s1_id = '#id_l4_class';
+          var s1_label = '#id_l4_class_label';
+          rmselect('id_l4_class');
+      }
+      $.ajax({
+        url: '{% url "load_lmclass" %}',
+        data: { 'classname': val },
+        dataType: 'json',
+        success: function (data) {
+          if (data.length > 0) {
+            for (var i = 0; i < data.length; i++) {
+              $(s1).append('<option value='+ data[i].name +'>'+ data[i].line +'</option>');
+            };
+            $(s1_id).css("display","block")
+            $(s1_label).css("display","block")
+          } else {
+            $(s1_id).css("display","none")
+            $(s1_label).css("display","none")
+          }
+        }
+      });
+    }
+    function rmselect(s1){
+      var label = s1+"_label";
+      var s1  = document.getElementById(s1);
+      while (s1.options.length > 0) {
+        s1.remove(0);
+      }
+      var newOption = document.createElement("option");
+      newOption.value = "";
+      newOption.innerHTML = "---------";
+      s1.options.add(newOption);
+      s1.style.display = 'none'
+      document.getElementById(label).style.display = 'none';
+    }
+    function populate_version(){
+      var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+      var val = $("#id_software").val();
+      var ff = $("#id_softversion").val();
+      var s1  = document.getElementById("id_softversion");
+      while (s1.options.length > 0) {
+        s1.remove(0);
+      }
+      $.ajax({
+        url: '{% url "load_svlist" %}',
+        data: ({'software': JSON.stringify(val)}),
+        type: 'POST',
+        dataType: 'json',
+        success: function (data) {
+          if (data.length > 0) {
+            $(s1).append('<option value="">---------</option>');
+            for (var i = 0; i < data.length; i++) {
+              if (ff == data[i].value) {
+                $(s1).append('<option value='+ data[i].value +' selected="selected">'+ data[i].version +'</option>');
+              } else {
+                $(s1).append('<option value='+ data[i].value +'>'+ data[i].version +'</option>');
+              }
+            };
+          } else {
+            $(s1).append('<option value="">---------</option>');
+          }
+          populate();
+        }
+      });
+    }
+    $("#id_software").change(function() {
+      populate_version();
+    });
+    function populate(){
+      var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+      var software = $("#id_software").val();
+      var version = $("#id_softversion").val();
+      var ff = $("#id_forcefield").val();
+      var s1  = document.getElementById("id_forcefield");
+      while (s1.options.length > 0) {
+        s1.remove(0);
+      }
+      $.ajax({
+        url: '{% url "load_fflist" %}',
+        data: ({'software': JSON.stringify(software), 'version': JSON.stringify(version), 'operator': 'OR'}),
+        type: 'POST',
+        dataType: 'json',
+        success: function (data) {
+          $(s1).append('<option value="">---------</option>');
+          if (data.length > 0) {
+            for (var i = 0; i < data.length; i++) {
+              if (ff == data[i].value) {
+                $(s1).append('<option value='+ data[i].value +' selected="selected">'+ data[i].name +'</option>');
+              } else {
+                $(s1).append('<option value='+ data[i].value +'>'+ data[i].name +'</option>');
+              }
+            };
+          }
+        }
+      });
+    }
+    $("#id_softversion").change(function() {
+      populate();
+    });
+  </script>
+  {{ form_select.media }}
+
+{% endblock %}

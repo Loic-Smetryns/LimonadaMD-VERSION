@@ -1,0 +1,54 @@
+{% extends "homepage/layout.html" %}
+
+{% block title %}Sign up{% endblock %}
+
+{% block content %}
+
+  <h2>Sign up</h2>
+  <br>
+
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="row py-1 ml-5">
+        <div class="col-3 col-lg-2 col-md-3 pt-1">
+          {% if field.name == "address" or field.name == "miscellaneous" %}<br>{% endif %}
+          {{ field.label_tag }}
+        </div>
+        <div class="col-9 col-lg-4">
+          {% if field.name == "address" or field.name == "miscellaneous" %}
+            <small class="float-right text-secondary">optional</small>
+          {% endif %}
+          {% if field.name == "utype" %}
+            <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control">
+              <option value="AC">Academic</option>
+              <option value="CO">Commercial</option>
+            </select>
+          {% elif field.name == "password1" %}
+            <input id="{{ field.id_for_label }}" name="{{ field.html_name }}" type="password"
+                class="form-control"/>
+          {% elif field.name == "password2" %}
+            <input id="{{ field.id_for_label }}" name="{{ field.html_name }}" type="password"
+                class="form-control"/>
+          {% else %}
+             {{ field }}
+          {% endif %}
+          {% for error in field.errors %}<span class="text-danger">{{ error|safe }}<br></span>{% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+    <div class="row ml-5">
+      <div class="col-auto pt-1">
+        <button type="submit" class="btn btn-primary">Sign up</button>
+      </div>
+    </div>
+  </form>
+  <p class="font-italic text-warning pt-3 pl-3 ml-5"><span class="font-weight-bold">N.B.:</span> Except for your
+      password, these informations will be public and could be seen by other users of Limonada.</p>
+
+{% endblock %}
+
+
+{% block script %}
+  {{ form.media.js }}
+{% endblock %}

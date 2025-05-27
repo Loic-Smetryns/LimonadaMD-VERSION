@@ -1,0 +1,81 @@
+{% extends "homepage/layout.html" %}
+
+{% load homepage_extras %}
+
+{% block title %}Forcefields{% endblock %}
+
+{% block content %}
+
+  <h1>Forcefields</h1>
+  <br>
+
+  <form action="" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="row py-1 ml-5">
+        <div class="col-4 col-xl-2 col-lg-3 col-md-4 pt-1">
+          {% if field.name == "ff_file" %}
+            <label for="{{ field.id_for_label }}">Forcefield files:
+              <span data-toggle="popover" data-trigger="hover" title="Forcefield files" data-html="true"
+                    data-content="Use a zip file containing the forcefield directory. This directory can be used as it
+                                  is to run membrane simulations. For Gromacs, it will be used during the validation
+                                  process of new topologies and should contain the forcefield.itp.">
+                  <i class="fas fa-info-circle text-success"></i>
+              </span>
+            </label>
+          {% elif field.name == "mdp_file" %}
+            <br>
+            <label for="{{ field.id_for_label }}">Parameters files:
+              <span data-toggle="popover" data-trigger="hover" title="Parameters files" data-html="true"
+                    data-content="Use a zip file containing the usual parameters for minimization, nvt, npt
+                                  and production run.">
+                  <i class="fas fa-info-circle text-success"></i>
+              </span>
+            </label>
+          {% else %}
+            {% if field.name == "description" %}<br>{% endif %}
+            {{ field.label_tag }}
+          {% endif %}
+        </div>
+        <div class="col-7 col-lg-4">
+          {% if field.name == "mdp_file" or field.name == "description" %}
+            <small class="float-right text-secondary">optional</small>
+          {% endif %}
+          {% if field.name == "ff_file" or field.name == "mdp_file"%}
+            <div class="input-group">
+              <div class="custom-file">
+                <input type="file" id="{{ field.id_for_label }}" name="{{ field.html_name }}"
+                       class="custom-file-input"  accept=".zip">
+                <label id="label_{{ field.html_name }}" class="custom-file-label" for="{{ field.id_for_label }}">{{ field.value|basename }}</label>
+              </div>
+            </div>
+          {% else %}
+            {{ field }}
+          {% endif %}
+          {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+          {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+    <div class="row ml-5">
+      <div class="col-auto pt-1">
+        <button type="submit" class="btn btn-primary">{% if ffcreate %}Add{% else %}Update{% endif %}</button>
+      </div>
+    </div>
+  <input id="id_ffpath" type="hidden" name="ffpath" value="{{ ffpath }}"/>
+  <input id="id_mdppath" type="hidden" name="mdppath" value="{{ mdppath }}"/>
+  </form>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    $(document).ready(function(){
+      $('[data-toggle="popover"]').popover();
+    });
+  </script>
+  {{ form.media }}
+
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends "homepage/layout.html" %}
+
+{% load homepage_extras %}
+
+{% block title %}Topologies{% endblock %}
+
+{% block content %}
+
+  <h1>Topologies</h1>
+  <br>
+
+  <p class="font-italic m-0 pl-1"><span class="font-weight-bold">N.B.:</span> If you use the following files in your
+      work, please cite the primary source. (see Description field)</p>
+  <div class="row align-items-center bg-white border rounded border-success px-3 pt-3 mx-1">
+    <div class="col-12 col-lg-7 table-responsive">
+      <table class="table table-sm">
+        <tbody>
+          <tr>
+            <td class="font-weight-bold w-30">Lipid:</td>
+            <td>
+              <a class="text-success" href="{% url 'lipdetail' topology.lipid.slug %}">
+                  {{ topology.lipid.name }} - {{ topology.lipid.com_name }}</a>
+            </td>
+          </tr>
+          {% if topology.residuelist_set.all.count > 1 %}
+            <tr>
+              <td class="font-weight-bold w-30">Residues:</td>
+              <td>
+                {% for res in topology.residuelist_set.all|dictsort:"position" %}
+                  {{ res.residue }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+              </td>
+            </tr>
+          {% endif %}
+          <tr>
+            <td class="font-weight-bold">Forcefield:</td>
+            <td>
+              <a class="text-success" href="{% url 'fflist' %}?ffid={{ topology.forcefield.pk }}">
+                  {{ topology.forcefield }}</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="font-weight-bold">Software:</td>
+            <td>
+              {% with topology.software.all|first as soft %}{{ soft.name }}{% endwith %}
+              {% for soft in topology.software.all|dictsort:"order" %}
+                {{ soft.version }}{% if not forloop.last %},{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          <tr><td class="font-weight-bold">Version:</td><td>{{ topology.version }}</td></tr>
+          <tr>
+            <td class="font-weight-bold">Files:</td>
+            <td>
+              <a href="{{ topology.gro_file.url }}" class="text-success" target="blank">
+                  {{ topology.gro_file.url|basename }}</a>,
+              <a href="{{ topology.itp_file.url }}" class="text-success" target="blank">
+                  {{ topology.itp_file.url|basename }}</a>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Description:</strong></td>
+            <td>{{ topology.description|linebreaks|urlize }}</td>
+          </tr>
+          <tr>
+            <td><strong>References:</strong></td>
+            <td>
+              {% for reference in topology.reference.all %}
+                <a class="text-success" href="http://dx.doi.org/{{ reference.doi }}">{{ reference.refid }}</a>
+                <i>{{ reference.journal }}</i>, {{ reference.volume }}.
+                {{ reference.title }}<br>
+              {% endfor %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <a class="text-success" href="{% url 'memlist' %}?topid={{ topology.pk }}">Available Membranes</a>
+      <br><br>
+      {% if user.is_authenticated %}
+        {% if user == topology.curator %}
+          <a href="{% url 'topupdate' topology.pk %}"><i class="fas fa-edit text-success"></i></a>&nbsp
+          <a href="{% url 'topdelete' topology.pk %}"><i class="fas fa-trash text-success"></i></a>
+        {% else %}
+          <a href="{% url 'mail' %}?topid={{ topology.pk }}"><i class="fas fa-edit text-success"></i></a>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="col-12 col-lg-5">
+      <div id="viewport" class="viewport-top"></div>
+    </div>
+    <div class="col-auto ml-auto">
+      <small>
+        <b>Curator:</b>
+        <a class="text-success" href="{% url 'userdetail' topology.curator.pk %}">
+            {{ topology.curator.get_full_name }}</a> on {{ topology.date }}
+      </small>
+    </div>
+  </div>
+  <br>
+
+  <h2>Comments</h2>
+  <div class="row bg-white border rounded border-success p-3 mx-1">
+    <div class="col-12 comments">
+      {% for comment in comments %}
+        {{ comment.comment }}<br>
+        <p class="text-right p-0"><small class="text-secondary">{{ comment.user.get_full_name }} on {{ comment.date }}</small><p>
+        {% if not forloop.last %}<hr>{% endif %}
+      {% endfor %}
+      {% if comments|length == 0 %}
+        No comments yet<br>
+      {% endif %}
+    </div>
+    {% if user.is_authenticated %}
+      <form method="post">
+        {% csrf_token %}
+        <div class="col-12 pt-2">
+          <textarea id="{{ form.comment.id_for_label }}" name="{{ form.comment.html_name }}" class="form-control bg-light" rows="2" cols="110"></textarea>
+          {% if form.comment.help_text %}<small class="text-secondary">{{ form.comment.help_text }}<br></small>{% endif %}
+          {% for error in form.comment.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+          <button type="submit" class="btn btn-primary btn-sm mt-2">Add</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+  <br>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    $(document).ready(function(){
+      $(".comments").scrollTop($(".comments")[0].scrollHeight);
+    });
+    var name = "{{ topology.gro_file.url|basename }}";
+    var data = "../..{{ topology.gro_file.url|dirname }}/";
+    var atomPair = {{ cgbonds }};
+    NGL.DatasourceRegistry.add("data", new NGL.StaticDatasource(data))
+    var stage;
+    document.addEventListener("DOMContentLoaded", function () {
+      stage = new NGL.Stage('viewport')
+      // Handle window resizing
+      window.addEventListener( "resize", function( event ){
+        stage.handleResize();
+      }, false );
+      stage.loadFile("data://"+name).then(function (o) {
+        // Rotation in rad
+        var e = new NGL.Euler( 4.71, 0, 0 );
+        var q = new NGL.Quaternion().setFromEuler( e );
+        o.setRotation( q );
+        o.addRepresentation("licorice") //ball+stick
+        o.addRepresentation("distance", {
+          atomPair: atomPair,
+          useCylinder: true,
+          labelVisible: false,
+        })
+        o.autoView()
+      })
+    })
+  </script>
+
+{% endblock %}

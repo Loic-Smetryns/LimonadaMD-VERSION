@@ -1,0 +1,208 @@
+{% extends "homepage/layout.html" %}
+
+{% load forcefield_extras %}
+{% load homepage_extras %}
+
+{% block title %}Forcefields{% endblock %}
+
+{% block description %}
+  molecular dynamics forcefield repository of limonada
+{% endblock %}
+
+{% block content %}
+
+  <!-- Title -->
+  <div class="row align-items-center justify-content-between">
+    <div class="col-auto"><h1>Forcefields</h1></div>
+    <div class="col-auto">
+      {% if user.is_authenticated %}
+        <a href="{% url 'ffcreate' %}" class="btn btn-primary" role="button">Add</a>
+      {% endif %}
+    </div>
+  </div>
+  <br>
+
+  <!-- Search form -->
+  <p class="font-italic m-0 pl-1"><span class="font-weight-bold">N.B.:</span> If you use the following files in
+      your work, please cite the primary source. (see Description field)</p>
+  <div class="row justify-content-between bg-green rounded-top border border-bottom-0 border-success p-3 mx-1">
+    <div class="col-auto px-0">
+        {% include 'per_page.html' %}
+    </div>
+    <div id="collapseselect" class="col-12 col-lg-auto col-md-7 order-last"
+         {% if not params.software %}style="display: none"{% endif %}>
+      <div class="container">
+        <form id="select_form" method="get">
+          {% csrf_token %}
+          <div class="row pt-1">
+            {% for field in form_select %}
+              <div class="col-12 col-lg-auto col-md-12 col-sm-12 d-flex">
+                <div class="pr-2 py-1">{{ field.label_tag }}</div>
+                <div>
+                  {% if field.name == 'softversion' %}
+                    <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control">
+                    {% if params.software %}
+                      {% sv_select params.software as svobjects %}
+                    {% endif %}
+                    <option value="">---------</option>
+                    {% if svobjects %}
+                      {% for value,name in svobjects %}
+                        <option value="{{ value }}"
+                                {% if value|slugify == params.softversion %}selected="selected"{% endif %}>
+                          {{ name }}
+                        </option>
+                      {% endfor %}
+                    {% endif %}
+                    </select>
+                  {% else %}
+                    {{ field }}
+                  {% endif %}
+                  {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+                  {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          <a onclick="url_replace('software', 'softversion','forcefield_type')" class="btn btn-primary btn-sm text-white">
+              Select</a>
+        </form>
+      </div>
+    </div>
+    <div class="col-auto ml-auto order-md-last">
+      <h2 class="text-info" id="clickselect"><i id="iconselect" class="fas fa-plus"></i></h2>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="row align-items-center bg-white border border-top-0 border-bottom-0 border-success p-3 mx-1">
+    <div class="col-12 table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th class="w-25">
+              {% if sort == "name" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="name" dir="des" %}">Name</a>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="name" dir="asc" %}">Name</a>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="name" dir="asc" %}">Name</a>
+              {% endif %}
+            </th>
+            <th class="w-20">Software</th>
+            <th class="w-20">
+              {% if sort == "forcefield_type" %}
+                {% if dir == "asc" %}
+                  <i class="fas fa-sort-up"></i>
+                  <a href="?{% url_replace sort="forcefield_type" dir="des" %}">Type</a>
+                {% else %}
+                  <i class="fas fa-sort-down"></i>
+                  <a href="?{% url_replace sort="forcefield_type" dir="asc" %}">Type</a>
+                {% endif %}
+              {% else %}
+                <a href="?{% url_replace sort="forcefield_type" dir="asc" %}">Type</a>
+              {% endif %}
+            </th>
+            <th class="w-25">Files</th>
+            {% if user.is_authenticated %}
+              <th class="w-10"></th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for forcefield in page_objects %}
+            <tr>
+              <td id="{{ forcefield.pk }}">
+                <a class="text-success" href="{% url 'ffdetail' forcefield.pk %}">
+                    {{ forcefield.name }}</a>
+              </td>
+              <td>{% with forcefield.software.all|first as soft %}{{ soft.name }}{% endwith %}</td>
+              <td>{{ forcefield.get_forcefield_type_display }}</td>
+              <td>
+                <a href="{{ forcefield.ff_file.url }}" class="text-success" target="blank">Forcefield</a>
+                {% if forcefield.mdp_file %}
+                  <a href="{{ forcefield.mdp_file.url }}" class="text-success" target="blank">Parameters</a>
+                {% endif %}
+              </td>
+              {% if user.is_authenticated %}
+                {% if user == forcefield.curator %}
+                  <td class="text-right">
+                    <a href="{% url 'ffupdate' forcefield.pk %}"><i class="fas fa-edit text-success"></i></a>
+                    <a href="{% url 'ffdelete' forcefield.pk %}"><i class="fas fa-trash text-success"></i></a>&nbsp
+                  </td>
+                {% else %}
+                  <td class="text-right">
+                    <a href="{% url 'mail' %}?ffid={{ forcefield.pk }}"><i class="fas fa-edit text-success"></i></a>
+                  </td>
+                {% endif %}
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="row bg-green rounded-bottom border border-top-0 border-success p-3 mx-1">
+    {% include 'paginator.html' %}
+  </div>
+  <br>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+    function csrfSafeMethod(method) {
+        // these HTTP methods do not require CSRF protection
+        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+            // if not safe, set csrftoken
+            if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+    });
+    function populate_version(){
+      var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+      var val = $("#id_software").val();
+      var ff = $("#id_softversion").val();
+      var s1  = document.getElementById("id_softversion");
+      while (s1.options.length > 0) {
+        s1.remove(0);
+      }
+      $.ajax({
+        url: '{% url "load_svlist" %}',
+        data: ({'software': JSON.stringify(val)}),
+        type: 'POST',
+        dataType: 'json',
+        success: function (data) {
+          if (data.length > 0) {
+            $(s1).append('<option value="">---------</option>');
+            for (var i = 0; i < data.length; i++) {
+              if (ff == data[i].value) {
+                $(s1).append('<option value='+ data[i].value +' selected="selected">'+ data[i].version +'</option>');
+              } else {
+                $(s1).append('<option value='+ data[i].value +'>'+ data[i].version +'</option>');
+              }
+            };
+          } else {
+            $(s1).append('<option value="">---------</option>');
+          }
+          populate();
+        }
+      });
+    }
+    $("#id_software").change(function() {
+      populate_version();
+    });
+  </script>
+  {{ form_select.media }}
+
+{% endblock %}

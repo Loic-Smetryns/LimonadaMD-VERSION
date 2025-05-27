@@ -1,0 +1,65 @@
+{% extends "homepage/layout.html" %}
+
+{% block title %}References{% endblock %}
+
+{% block content %}
+
+  <h1>Articles</h1>
+  <br>
+
+  {% if search %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="row ml-5">
+        {% for field in form_search %}
+          <div class="col-3 col-lg-1 col-md-2 pt-1">{{ field.label_tag }}</div>
+          <div class="col-6 col-lg-4 col-md-7">
+            {{ field }}
+            {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+            {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+          </div>
+        {% endfor %}
+        <div class="col-1 pt-1">
+          <button type="submit" class="btn btn-primary btn-sm" name="search">Search</button>
+        </div>
+      </div>
+    </form>
+    <div class="row p-1 ml-5">
+      <div class="col-12 col-lg-6 col-md-11 border border-top-0 border-right-0 border-left-0 border-success"><br></div>
+    </div>
+    <br>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form_add %}
+      <div class="row py-1 ml-5">
+        <div class="col-3 col-lg-1 col-md-2 pt-1">{{ field.label_tag }}</div>
+        <div class="col-9 col-lg-5">
+          {{ field }}
+          {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+          {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+        </div>
+      </div>
+      {% if field.name == "refid" %}
+        {% for aufield in form_authors %}
+          <div class="row py-1 ml-5">
+            <div class="col-3 col-lg-1 col-md-2 pt-1">{{ aufield.label_tag }}</div>
+            <div class="col-9 col-lg-5">
+              {{ aufield }}
+              {% if aufield.help_text %}<small class="text-secondary">{{ aufield.help_text }}<br></small>{% endif %}
+              {% for error in aufield.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    <div class="row ml-5">
+      <div class="col-auto pt-1">
+        <button type="submit" class="btn btn-primary" name="add">
+          {% if search %}Add{% else %}Update{% endif %}
+        </button>
+      </div>
+    </div>
+  </form>
+
+{% endblock %}

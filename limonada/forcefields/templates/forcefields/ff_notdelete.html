@@ -1,0 +1,14 @@
+{% extends "homepage/layout.html" %}
+
+{% block title %}Topologies{% endblock %}
+
+{% block content %}
+
+  <h1>Forcefields</h1>
+  <br>
+  <p>The forcefield record "{{ ff }}" is associated with {{ nbtop }} topology and {{ nbmem }} membrane objects.<br>
+      As you are not the curator of all these objects, you cannot delete "{{ ff }}".<br>
+      If you still want to delete this record, please contact the other curators or the Limonada Team.</p>
+  <br>
+
+{% endblock %}

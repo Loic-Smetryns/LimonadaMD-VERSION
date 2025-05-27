@@ -1,0 +1,490 @@
+{% extends "homepage/layout.html" %}
+
+{% load homepage_extras %}
+{% load lipid_extras %}
+{% load forcefield_extras %}
+{% load membrane_extras %}
+
+{% block title %}Membranes{% endblock %}
+
+{% block content %}
+
+  <h1>Membranes</h1>
+  <br>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in topform %}
+      <div class="row py-1 ml-5">
+        <div class="col-3 col-lg-2 col-md-3 pt-1">
+          {% if field.name == "mem_file" or field.name == "other_file" or field.name == "description" or field.name == "prot" or field.name == "doi" %}
+              <br>
+          {% endif %}
+          {{ field.label_tag }}
+          {% if field.name == "other_file" %}
+            <span data-toggle="popover" data-trigger="hover" title="Parameters files"
+                  data-content='Parameters files required to run a simulation with this membrane should be uploaded as a .zip file.
+                      If a mdp file is not provided, parameters like cutoff value, range (if a switching function), and type (force 
+                      vs. potential) should be described in a dedicated file or in the description field. If used, additional 
+                      topologies (i.e. for proteins) should also be provided.'>
+                <i class="fas fa-info-circle text-success"></i></span>
+          {% endif %}
+        </div>
+        {% if field.name == "mem_file" %}
+          <div class="col-7 col-lg-4 col-md-7">
+            <small class="float-right text-secondary">optional</small>
+            <div class="input-group">
+              <div class="custom-file">
+                <input type="file" id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="custom-file-input"
+                       accept=".gro,.pdb">
+                <label class="custom-file-label" for="{{ field.html_name }}">{{ field.value|basename }}</label>
+              </div>
+            </div>
+            {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+            {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+            {% for info in minfos %}<span class="text-warning">{{ info }}<br></span>{% endfor %}
+            {% for error in merrors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+          </div>
+          <div class="col-2">
+            <br>
+            <button class="btn btn-sm" name="analyze" onclick="readfile();">Analyze</button>
+            <span data-toggle="popover" data-trigger="hover" title="Membrane analysis"
+                  data-content='This function allows to fill the composition form from a membrane structrure file.
+                      It reorders lipids according to the composition and leaflets. Structure files associated with Amber
+                      cannot be analyzed because lipids are usually build from several residues.'>
+                <i class="fas fa-info-circle text-success"></i></span>
+          </div>
+        {% elif field.name == "other_file" %}
+          <div class="col-7 col-lg-4 col-md-7">
+            <small class="float-right text-secondary">optional</small>
+            <div class="input-group">
+              <div class="custom-file">
+                <input type="file" id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="custom-file-input"
+                       accept=".zip">
+                <label class="custom-file-label" for="{{ field.html_name }}">{{ field.value|basename }}</label>
+              </div>
+            </div>
+            {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+            {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+          </div>
+        {% elif field.name == 'forcefield' %}
+          <div class="col-9 col-lg-4 col-md-7">
+            <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control">
+            {% if topform.software.value %}
+              {% ff_select "" topform.software.value as ffobjects %}
+            {% endif %}
+            {% if ffobjects %}
+              {% for value,name in ffobjects %}
+                <option value="{{ value }}"
+                        {% if value|stringformat:"s" == field.value|stringformat:"s" %}selected="selected"{% endif %}>
+                  {{ name }}
+                </option>
+              {% endfor %}
+            {% else %}
+              <option value="">---------</option>
+            {% endif %}
+            </select>
+            {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+            {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+          </div>
+        {% else %}
+          <div class="col-9 col-lg-4 col-md-7">
+            {% if field.name == "description" or field.name == "prot" or field.name == "doi" %}
+              <small class="float-right text-secondary">optional</small>
+            {% endif %}
+            {{ field }}
+            {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+            {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      {% if field.name == 'mem_file' %}
+        <div class="row py-1 ml-5">
+          <div class="col-3 col-lg-2 col-md-3 pt-1">Composition:</div>
+          <div id="mem-form" class="col-9 col-lg-10 col-md-9">
+            <div class="container p-0 pt-1">
+              <div class="row d-flex flex-nowrap">
+                <div class="col-12 col-lg-4 col-md-6 col-sm-8 pl-3">Lipid</div>
+                <div class="col-5 col-lg-2 col-md-3 col-sm-4 xs-hide pl-2">Topology</div>
+                <div class="col-5 col-lg-2 col-md-3 col-sm-4 sm-hide pl-1">Number</div>
+                <div class="col-4 col-sm-2 md-hide pl-1">Side</div>
+              </div>
+              {% side_select nbmemb as sideobjects %}
+              {% for lip in formset.forms %}
+                <div id="{{ lip.prefix }}-row" class="row form-row align-items-center">
+                  <div class="col-12 col-lg-4 col-md-6 col-sm-8 pt-1">{{ lip.lipid }}</div>
+                  <div class="col-5 col-lg-2 col-md-3 col-sm-4 pt-1">
+                    {% if lip.topology.value %}
+                      {% top_select lip.lipid.value topform.forcefield.value as topobjects %}
+                    {% endif %}
+                    {% if lip.lipid.value and not lip.topology.value %}
+                      <select id="id_{{ lip.prefix }}-topology" name="{{ lip.prefix }}-topology"
+                              class="form-control-sm text-danger w-100">
+                    {% elif topobjects|length > 1 %}
+                      <select id="id_{{ lip.prefix }}-topology" name="{{ lip.prefix }}-topology"
+                              class="form-control-sm text-success w-100">
+                    {% else %}
+                      <select id="id_{{ lip.prefix }}-topology" name="{{ lip.prefix }}-topology"
+                              class="form-control-sm w-100">
+                    {% endif %}
+                    {% if ffobjects and lip.topology.value %}
+                      {% for value,name in topobjects %}
+                        <option value="{{ value }}"
+                          {% if value|stringformat:"s" == lip.topology.value|stringformat:"s" %}
+                            selected="selected"
+                          {% endif %}>
+                          {{ name }}
+                        </option>
+                      {% endfor %}
+                    {% else %}
+                      <option value="">---------</option>
+                    {% endif %}
+                    </select>
+                  </div>
+                  <div class="col-5 col-lg-2 col-md-3 col-sm-4 pt-1">
+                    <input id="id_{{ lip.prefix }}-number" type="number" name="{{ lip.prefix }}-number"
+                           value="{{ lip.number.value }}" class="form-control-sm w-100"/>
+                  </div>
+                  <!--<div class="col-0 pt-1 pl-2">{{ lip.side }}</div>-->
+                  <div class="col-0 pt-1 pl-2">
+                     <select id="id_{{ lip.prefix }}-side" name="{{ lip.prefix }}-side" class="sideselect form-control-sm" >
+                      {% for value,name in sideobjects %}
+                        <option value="{{ value }}"
+                          {% if value == lip.side.value %}
+                            selected="selected"
+                          {% endif %}>
+                          {{ name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-0 pt-1 pl-1">
+                    <button id="{{ lip.prefix }}-add" type="button" class="btn btn-success btn-sm add-form-row"
+                        name="{{ lip.prefix }}-add"><i class="fas fa-plus"></i></button>
+                    <button id="{{ lip.prefix }}-remove" type="button" class="btn btn-danger btn-sm remove-form-row"
+                        name="{{ lip.prefix }}-remove"><i class="fas fa-minus"></i></button>
+                  </div>
+                  {% if not lip.number.value or not lip.topology.value %}
+                    {% if lip.lipid.value %}
+                      <p class="text-danger">The topology and/or number values are missing.</p>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+    {{ formset.management_form }}
+
+    {% for memfield in memform %}
+      <div class="row py-1 ml-5">
+        <div class="col-3 col-lg-2 col-md-3 pt-1">
+          {% if memfield.name == "tag" %}<br>{% endif %}
+          {{ memfield.label_tag }}
+          {% if memfield.name == "tag" %}
+            <span data-toggle="popover" data-trigger="hover" title="Membrane tags"
+                  data-content='Membrane tags enable to describe precisely which biological membrane has been
+                      modeled. Use as much tags as necessary.'>
+                <i class="fas fa-info-circle text-success"></i></span>
+          {% endif %}
+        </div>
+        <div class="col-9 col-lg-4 col-md-7">
+          {% if memfield.name == "tag" %}
+            <small class="float-right text-secondary">optional</small>
+          {% endif %}
+          {{ memfield }}
+          {% if memfield.help_text %}<small class="text-secondary">{{ memfield.help_text }}<br></small>{% endif %}
+          {% for error in memfield.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+
+    <div class="row ml-5">
+      <div class="col-auto pt-1">
+        <button type="submit" class="btn btn-primary" name="add">
+          {% if memcreate %}Add{% else %}Update{% endif %}
+        </button>
+      </div>
+    </div>
+    <input type="hidden" name="rand" value="{{ rand }}"/>
+    <input type="hidden" name="fname" value="{{ fname }}"/>
+    <input type="hidden" name="extension" value="{{ extension }}"/>
+    <input type="hidden" name="mempath" value="{{ mempath }}"/>
+    <input type="hidden" name="otherpath" value="{{ otherpath }}"/>
+  </form>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    $(document).ready(function(){
+      $('[data-toggle="popover"]').popover();
+    });
+
+    var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+    function csrfSafeMethod(method) {
+        // these HTTP methods do not require CSRF protection
+        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+            // if not safe, set csrftoken
+            if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+    });
+
+    $(document).on('click', '.add-form-row', function(){
+      addForm();
+      mvFormContent($(this));
+    });
+
+    function addForm() {
+      var total = $('#id_form-TOTAL_FORMS').val();
+      $('<div/>', {"class":"row form-row",}).appendTo('#mem-form');
+      $('<div/>', {"class":"lip col-12 col-lg-4 col-md-6 col-sm-8 pt-1"}).appendTo('.form-row:last');
+      $('<div/>', {"class":"top col-5 col-lg-2 col-md-3 col-sm-4 pt-1"}).appendTo('.form-row:last');
+      $('<div/>', {"class":"num col-5 col-lg-2 col-md-3 col-sm-4 pt-1"}).appendTo('.form-row:last');
+      $('<div/>', {"class":"side col-0 pt-1 pl-2"}).appendTo('.form-row:last');
+      $('<div/>', {"class":"min col-0 pt-1 pl-1"}).appendTo('.form-row:last');
+      var $lipid = $("<select>", {id:'id_form-'+total+'-lipid',
+                     name:'form-'+total+'-lipid',
+                     class:"dal-lipid",
+                     "data-autocomplete-light-function":"select2",
+                     "data-autocomplete-light-url":"/lipid-autocomplete/"});
+      $lipid.appendTo($('.form-row:last').children(".lip"));
+      $('[data-autocomplete-light-function]:not(.select2-hidden-accessible)').trigger('autocompleteLightInitialize');
+      var $topol = $("<select>", {id:'id_form-'+total+'-topology',name:'form-'+total+'-topology',
+                                  class:'form-control-sm w-100'});
+      $topol.append($('<option>', {value: '',text: '---------'}));
+      $topol.appendTo($('.form-row:last').children(".top"));
+      var $num = $("<input>", {id:'id_form-'+total+'-number',name:'form-'+total+'-number',step:'0.0001',type:'number',
+                               class:'form-control-sm w-100'});
+      $num.appendTo($('.form-row:last').children(".num"));
+      var $side = $("<select>", {id:'id_form-'+total+'-side',name:'form-'+total+'-side',class:'sideselect form-control-sm'});
+      $side.append($('<option>', {value: 'UP',text: 'Upper leaflet'}));
+      $side.append($('<option>', {value: 'LO',text: 'Lower leaflet'}));
+      for (var i=2; i<50; i++) {
+        $side.append($('<option>', {value: 'UP'+i,text: 'Upper leaflet '+i}));
+        $side.append($('<option>', {value: 'LO'+i,text: 'Lower leaflet '+i}));
+      }
+      $side.append($('<option>', {value: 'UNK',text: 'Not in leaflet'}));
+      $side.appendTo($('.form-row:last').children(".side"));
+      var $btnadd = $('<button>', {id:'form-'+total+'-add',name:'form-'+total+'-add',
+                                   "class":'btn btn-success btn-sm add-form-row',type:'button'});
+      $btnadd.html('<i class="fas fa-plus"></i>')
+      $btnadd.appendTo($('.form-row:last').children(".min"));
+      $('.form-row:last').children(".min").append(" ");
+      var $btnrm = $('<button>', {id:'form-'+total+'-remove',name:'form-'+total+'-remove',
+                                  "class":'btn btn-danger btn-sm remove-form-row',type:'button'});
+      $btnrm.html('<i class="fas fa-minus"></i>')
+      $btnrm.appendTo($('.form-row:last').children(".min"));
+      total++;
+      $('#id_form-TOTAL_FORMS').val(total);
+      updateleafselect();
+    };
+
+    function mvFormContent(btn) {
+      var total = parseInt($('#id_form-TOTAL_FORMS').val());
+      var ndx = parseInt(btn.attr('id').match(/[0-9]+/));
+      for (var i=total-1; i>ndx; i--) {
+        var id = $('#id_form-'+(i-1)+'-lipid').val();
+        if ( id ) {
+          var text = $('#id_form-'+(i-1)+'-lipid').text().replace("---------","");;
+          $('#id_form-'+i+'-lipid').append($('<option>', {value: id, text: text, selected: true}));
+          $('#id_form-'+(i-1)+'-lipid').empty();
+        }
+
+        var $options = $('#id_form-'+(i-1)+'-topology > option').clone();
+        $('#id_form-'+i+'-topology').empty();
+        $('#id_form-'+i+'-topology').append($options);
+        $('#id_form-'+i+'-topology').val($('#id_form-'+(i-1)+'-topology').val());
+        $('#id_form-'+(i-1)+'-topology').empty();
+        $('#id_form-'+(i-1)+'-topology').append($('<option>', {value: '',text: '---------'}));
+
+        $('#id_form-'+i+'-number').val($('#id_form-'+(i-1)+'-number').val());
+        $('#id_form-'+(i-1)+'-number').val("");
+        var side = $('select[name="form-'+(i-1)+'-side"]').val();
+        $('select[name="form-'+i+'-side"]').val(side);
+        $('select[name="form-'+(i-1)+'-side"]').val("UP");
+      }
+    };
+
+    $(document).on('click', '.remove-form-row', function(e){
+      delForm($(this));
+    });
+
+    function delForm(btn) {
+      var total = parseInt($('#id_form-TOTAL_FORMS').val());
+      if (total > 1){
+        btn.closest('.form-row').remove();
+        var forms = $('.form-row');
+        $('#id_form-TOTAL_FORMS').val(forms.length);
+        for (var i=0, formCount=forms.length; i<formCount; i++) {
+          $(forms.get(i)).find(':input').each(function() {updateElementIndex(this, i)});
+        }
+      }
+      updateleafselect();
+    };
+
+    function updateElementIndex(el, ndx) {
+      var id_regex = new RegExp('(form-\\d+)');
+      var replacement = 'form-' + ndx;
+      if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(id_regex, replacement));
+      if (el.id) el.id = el.id.replace(id_regex, replacement);
+      if (el.name) el.name = el.name.replace(id_regex, replacement);
+    };
+
+    function populate(){
+      var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+      var val = $("#id_software").val();
+      var ff = $("#id_forcefield").val();
+      var s1  = document.getElementById("id_forcefield");
+      while (s1.options.length > 0) {
+        s1.remove(0);
+      }
+      $.ajax({
+        url: '{% url "load_fflist" %}',
+        data: ({'software': JSON.stringify(''), 'version': JSON.stringify(val), 'operator': 'AND'}),
+        type: 'POST',
+        dataType: 'json',
+        success: function (data) {
+          if (data.length > 0) {
+            for (var i = 0; i < data.length; i++) {
+              if (ff == data[i].value) {
+                $(s1).append('<option value='+ data[i].value +' selected="selected">'+ data[i].name +'</option>');
+              } else {
+                $(s1).append('<option value='+ data[i].value +'>'+ data[i].name +'</option>');
+              }
+            };
+          } else {
+            $(s1).append('<option value="">---------</option>');
+          }
+        }
+      });
+    }
+    $("#id_software").change(function() {
+      var ff = $("#id_forcefield").val();
+      populate();
+      var total = parseInt($('#id_form-TOTAL_FORMS').val());
+      for (var i=0; i<total; i++) {
+        updatetopselect($('#id_form-'+i+'-lipid'), ff);
+      }
+    });
+
+    $(document).on('change', '#id_forcefield', function(e){
+      var ff = $("#id_forcefield").val();
+      var total = parseInt($('#id_form-TOTAL_FORMS').val());
+      for (var i=0; i<total; i++) {
+        updatetopselect($('#id_form-'+i+'-lipid'), ff);
+      }
+    });
+
+    $(document).on('change', '.dal-lipid', function(e){
+      var ff = $("#id_forcefield").val();
+      updatetopselect($(this), ff);
+    });
+
+    function updatetopselect(s1, ff){
+      var valueSelected = s1.val();
+      var lipid_name = s1.text();
+      var soft = $('#id_software').val();
+      var ndx = parseInt(s1.attr('id').match(/[0-9]+/));
+      $.ajax({
+        url: '{% url "getliptops" %}',
+        data: { 'lip': valueSelected, 'ff': ff, 'soft': soft },
+        dataType: 'json',
+        success: function (data) {
+          $('#id_form-'+ndx+'-topology').empty();
+          $('#id_form-'+ndx+'-topology').removeClass('text-success');
+          $('#id_form-'+ndx+'-topology').removeClass('text-danger');
+          if (data.length == 0) {
+            if (valueSelected) {
+              $('#id_form-'+ndx+'-topology').attr('class', 'text-danger form-control-sm w-100');
+            }
+            $('#id_form-'+ndx+'-topology').append('<option value="">---------</option>');
+          }
+          if (data.length > 1) {
+            $('#id_form-'+ndx+'-topology').attr('class', 'text-success form-control-sm w-100');
+          }
+          for (var i = data.length - 1; i >= 0; i--) {
+            $('#id_form-'+ndx+'-topology').append('<option value='+ data[i].value +'>'+ data[i].name +'</option>');
+          };
+        }
+      });
+    }
+
+    $(document).on('change', '.sideselect', function(e){
+      updateleafselect();
+    });
+
+    function updateleafselect(){
+      var total = parseInt($('#id_form-TOTAL_FORMS').val());
+      var nbmemb = 0;
+      for (var i=0; i<total; i++) {
+        var leaf = $('#id_form-'+i+'-side').val();
+        if (leaf != "UNK" && leaf != "") {
+          if (leaf.length == 2) {
+             if (1 > nbmemb) {nbmemb = 1};
+          } else {
+             var nbs = leaf.substring(2);
+             if (nbs > nbmemb) {nbmemb = nbs};
+          };
+        };
+      };
+      if (nbmemb < 1) {nbmemb = 1};
+      nbmemb++;
+      for (var i=0; i<total; i++) {
+        var leaf = $('#id_form-'+i+'-side').val();
+        var s1  = document.getElementById('id_form-'+i+'-side');
+        while (s1.options.length > 0) {
+          s1.remove(0);
+        };
+        if (leaf == "UP") {
+          $(s1).append('<option value="UP" selected="selected">Upper leaflet</option>');
+        } else {
+          $(s1).append('<option value="UP">Upper leaflet</option>');
+        };
+        if (leaf == "LO") {
+          $(s1).append('<option value="LO" selected="selected">Lower leaflet</option>');
+        } else {
+          $(s1).append('<option value="LO">Lower leaflet</option>');
+        };
+        for (var j=2; j<=nbmemb; j++) {
+          if (leaf == "UP"+j) {
+            $(s1).append('<option value="UP'+j+'" selected="selected">Upper leaflet '+j+'</option>');
+          } else {
+            $(s1).append('<option value="UP'+j+'">Upper leaflet '+j+'</option>');
+          };
+          if (leaf == "LO"+j) {
+            $(s1).append('<option value="LO'+j+'" selected="selected">Lower leaflet '+j+'</option>');
+          } else {
+            $(s1).append('<option value="LO'+j+'">Lower leaflet '+j+'</option>');
+          }
+        };
+        if (leaf == "UNK") {
+          $(s1).append('<option value="UNK" selected="selected">Not in leaflet</option>');
+        } else {
+          $(s1).append('<option value="UNK">Not in leaflet</option>');
+        };
+      };
+    };
+
+    function readfile() {
+       if ($('#mem_filetext').text().split('.').pop() == 'gro') {
+         $('#mem_filetext').closest('form').submit();
+       } else if ($('#mem_filetext').text().split('.').pop() == 'pdb') {
+         $('#mem_filetext').closest('form').submit();
+       }
+    }
+
+  </script>
+  {{ topform.media }}
+
+{% endblock %}

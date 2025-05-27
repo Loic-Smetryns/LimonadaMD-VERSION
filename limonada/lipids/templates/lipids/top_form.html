@@ -1,0 +1,144 @@
+{% extends "homepage/layout.html" %}
+
+{% load forcefield_extras %}
+{% load homepage_extras %}
+
+{% block title %}Topologies{% endblock %}
+
+{% block content %}
+
+  <h1>Topologies</h1>
+  <br>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="row py-1 ml-5">
+        <div class="col-3 col-lg-2 col-md-3 pt-1">
+          {% if field.name == "description" %}<br>{% endif %}
+          {% if field.name == "head" %}
+            <label for="{{ field.id_for_label }}">Head atom:
+              <span data-toggle="popover" data-trigger="hover" title="Head atom"
+                    data-content="An head atom, being at the level of phosphate atoms in lipid bilayers has to be
+		        identified for each lipid. These atoms are notably used to discriminate lipid leaflets with
+			fatslim.">
+                  <i class="fas fa-info-circle text-success"></i></span>
+            </label>
+        {% else %}
+          {{ field.label_tag }}
+        {% endif %}
+        </div>
+        <div class="col-9 col-lg-4 col-md-7">
+          {% if field.name == "description" %}
+            <small class="float-right text-secondary">optional</small>
+          {% endif %}
+          {% if field.name == "itp_file" or field.name == "gro_file" %}
+            <div class="input-group">
+              <div class="custom-file">
+                {% if field.name == "itp_file" %}
+                  <input type="file" id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="custom-file-input"
+                         accept=".itp,.str,.lib">
+                {% else %}
+                  <input type="file" id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="custom-file-input"
+                         accept=".gro,.pdb">
+                {% endif %}
+                <label class="custom-file-label" for="{{ field.id_for_label }}">{{ field.value|basename }}</label>
+              </div>
+            </div>
+          {% elif field.name == 'forcefield' %}
+            <select id="{{ field.id_for_label }}" name="{{ field.html_name }}" class="form-control">
+            {% if form.software.value %}
+              {% ff_select "" form.software.value as ffobjects %}
+            {% endif %}
+            {% if ffobjects %}
+              {% for value,name in ffobjects %}
+                <option value="{{ value }}"
+                        {% if value|stringformat:"s" == field.value|stringformat:"s" %}selected="selected"{% endif %}>
+                  {{ name }}
+                </option>
+              {% endfor %}
+            {% else %}
+              <option value="">---------</option>
+            {% endif %}
+            </select>
+          {% else %}
+            {{ field }}
+          {% endif %}
+          {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}<br></small>{% endif %}
+          {% for error in field.errors %}<span class="text-danger">{{ error }}<br></span>{% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+    <div class="row ml-5">
+      <div class="col-auto pt-1">
+        <button type="submit" class="btn btn-primary">{% if topcreate %}Add{% else %}Update{% endif %}</button>
+      </div>
+    </div>
+    <input type="hidden" name="itppath" value="{{ itppath }}"/>
+    <input type="hidden" name="gropath" value="{{ gropath }}"/>
+  </form>
+
+{% endblock %}
+
+
+{% block script %}
+
+  <script>
+    $(document).ready(function(){
+      $('[data-toggle="popover"]').popover();
+    });
+  </script>
+  <script>
+    var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+    function csrfSafeMethod(method) {
+        // these HTTP methods do not require CSRF protection
+        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+            // if not safe, set csrftoken
+            if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+    });
+    function basename(){
+      filefield = arguments[0];
+      textfield = arguments[1];
+      $(textfield).text($(filefield).val().split('\\').slice(-1)[0])
+    }
+    function populate(){
+      var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+      var val = $("#id_software").val();
+      var ff = $("#id_forcefield").val();
+      var s1  = document.getElementById("id_forcefield");
+      while (s1.options.length > 0) {
+        s1.remove(0);
+      }
+      $.ajax({
+        url: '{% url "load_fflist" %}',
+        data: ({'software': JSON.stringify(''), 'version': JSON.stringify(val), 'operator': 'AND'}),
+        type: 'POST',
+        dataType: 'json',
+        success: function (data) {
+          if (data.length > 0) {
+            for (var i = 0; i < data.length; i++) {
+              if (ff == data[i].value) {
+                $(s1).append('<option value='+ data[i].value +' selected="selected">'+ data[i].name +'</option>');
+              } else {
+                $(s1).append('<option value='+ data[i].value +'>'+ data[i].name +'</option>');
+              }
+            };
+          } else {
+            $(s1).append('<option value="">---------</option>');
+          }
+        }
+      });
+    }
+    $("#id_software").change(function() {
+      populate();
+    });
+  </script>
+  {{ form.media }}
+
+{% endblock %}
