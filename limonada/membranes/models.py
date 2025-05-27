@@ -23,7 +23,6 @@
 from __future__ import unicode_literals
 from unidecode import unidecode
 import os
-import random
 
 # Django
 from django.conf import settings

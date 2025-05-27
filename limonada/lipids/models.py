@@ -24,6 +24,7 @@ from __future__ import unicode_literals
 from unidecode import unidecode
 import os
 import re
+import shutil
 
 # third-party
 import requests
@@ -40,6 +41,8 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.utils.formats import localize
 from django.utils.translation import ugettext_lazy as _
 from django.utils.text import slugify
+from django.core.files.base import ContentFile
+
 
 # Django apps
 from limonada.functions import delete_file
@@ -265,6 +268,16 @@ class ResidueList(models.Model):
                                 on_delete=models.CASCADE)
     position = models.PositiveIntegerField()
 
+    def clone(self, topol):
+        clone = ResidueList(
+            topology=topol,
+            residue=self.residue,
+            position=self.position
+        )
+        clone.save()
+        
+        return clone
+
     def __str__(self):
         return self.residue.name
 
@@ -290,8 +303,10 @@ class Topology(models.Model):
     description = models.TextField(blank=True)
     reference = models.ManyToManyField('homepage.Reference')
     date = models.DateField(auto_now=True)
-    curator = models.ForeignKey(User,
-                                on_delete=models.CASCADE)
+    curator = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    t_version = models.IntegerField(default=1)
+    root_version = models.ForeignKey('lipids.Topology', null=True, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return '%s_%s' % (self.lipid.name, self.version)
@@ -306,6 +321,45 @@ class Topology(models.Model):
     @property
     def url(self):
         return reverse('api-topdetail', kwargs={'pk': self.id})
+    
+    def clone(self):
+        topol_clone = Topology(
+            forcefield=self.forcefield,
+            lipid=self.lipid,
+            version=self.version,
+            head=self.head,
+            description=self.description,
+            date=self.date,
+            curator=self.curator
+        )
+        topol_clone.save()
+        
+        topol_clone.root_version = self.root_version if self.root_version else self
+        
+        last_version = Topology.objects.filter(
+            root_version=topol_clone.root_version
+        ).order_by('-t_version').first()
+        
+        topol_clone.t_version = last_version.t_version + 1 if last_version else 2
+        
+        for res in self.residuelist_set.all():
+            res.clone(topol_clone)
+        
+        topol_clone.software.set(self.software.all())
+        topol_clone.reference.set(self.reference.all())
+        
+        if self.itp_file:
+            topol_clone.itp_file=topol_clone.root_version.itp_file.name[:-4]+"_"+str(topol_clone.t_version)+topol_clone.root_version.itp_file.name[-4:]
+            shutil.copy2(self.itp_file.path, topol_clone.itp_file.path)
+        
+        if self.gro_file:
+            topol_clone.gro_file=topol_clone.root_version.gro_file.name[:-4]+"_"+str(topol_clone.t_version)+topol_clone.root_version.gro_file.name[-4:]
+            shutil.copy2(self.gro_file.path, topol_clone.gro_file.path)
+        
+        topol_clone.save()
+    
+        
+        return topol_clone
 
 
 @python_2_unicode_compatible

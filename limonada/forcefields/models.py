@@ -23,6 +23,7 @@
 from __future__ import unicode_literals
 from unidecode import unidecode
 import os
+import shutil
 
 # Django
 from django.conf import settings
@@ -34,6 +35,7 @@ from django.utils.formats import localize
 from django.db import models
 from django.db.models.signals import m2m_changed, pre_delete, pre_save
 from django.dispatch.dispatcher import receiver
+from django.core.files.base import ContentFile
 
 # Django apps
 from limonada.functions import delete_file
@@ -93,20 +95,20 @@ class Forcefield(models.Model):
                                        choices=FFTYPE_CHOICES,
                                        default='AA')
     ff_file = models.FileField(upload_to=ff_path,
-                               validators=[validate_file_extension,
-                                           validate_ff_size],
+                               validators=[validate_file_extension, validate_ff_size],
                                help_text='Use a zip file containing the forcefield directory')
     mdp_file = models.FileField(upload_to=mdp_path,
-                                validators=[validate_file_extension,
-                                            validate_mdp_size],
+                                validators=[validate_file_extension, validate_mdp_size],
                                 help_text='Use a zip file containing the mdps for the version X of Gromacs',
                                 null=True)
     software = models.ManyToManyField('forcefields.Software')
     description = models.TextField(blank=True)
     reference = models.ManyToManyField('homepage.Reference')
-    curator = models.ForeignKey(User,
-                                on_delete=models.CASCADE)
+    curator = models.ForeignKey(User, on_delete=models.CASCADE)
     date = models.DateField(auto_now=True)
+    
+    version = models.IntegerField(default=1)
+    root_version = models.ForeignKey('forcefields.Forcefield', null=True, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.name
@@ -117,6 +119,42 @@ class Forcefield(models.Model):
     @property
     def url(self):
         return reverse('api-ffdetail', kwargs={'pk': self.id})
+    
+    def clone(self):
+        for_clone = Forcefield(
+            name=self.name,
+            forcefield_type=self.forcefield_type,
+            description=self.description,
+            curator=self.curator,
+            date=self.date
+        )
+        
+        for_clone.save()
+        
+        for_clone.software.set(self.software.all())
+        for_clone.reference.set(self.reference.all())
+        
+        for_clone.root_version = self.root_version if self.root_version else self
+        
+        last_version = Forcefield.objects.filter(
+            root_version=for_clone.root_version
+        ).order_by('-version').first()
+        
+        for_clone.version = last_version.version + 1 if last_version else 2
+        
+        for_clone.save()
+        
+        if self.ff_file:
+            for_clone.ff_file=for_clone.root_version.ff_file.name[:-7]+"_"+str(for_clone.version)+for_clone.root_version.ff_file.name[-7:]
+            shutil.copy2(self.ff_file.path, for_clone.ff_file.path)
+            
+        if self.mdp_file:
+            for_clone.mdp_file=for_clone.root_version.mdp_file.name[:-8]+"_"+str(for_clone.version)+for_clone.root_version.mdp_file.name[-8:]
+            shutil.copy2(self.mdp_file.path, for_clone.mdp_file.path)
+        
+        for_clone.save()
+        
+        return for_clone
 
 
 @python_2_unicode_compatible

@@ -27,7 +27,7 @@ from .forms import MemFormSet
 from .views import (GetFiles, GetLipTops, MembraneTopolAutocomplete, MembraneAutocomplete,
                     MembraneProtAutocomplete, MembraneDoiAutocomplete,
                     MembraneTagAutocomplete, MemCreate, MemDelete, MemDetail, MemList, MemUpdate, MemNewVersion,
-                    APIMemList, APIMemDetails)
+                    GetFFVersions)
 
 urlpatterns = [
     url(r'^membranes/$', MemList, name='memlist'),
@@ -50,4 +50,5 @@ urlpatterns = [
         name='membranetagautocomplete'),
     url(r'^getliptops/$', GetLipTops, name='getliptops'),
     url(r'^getfiles/$', GetFiles, name='getfiles'),
+    url(r'^get-ff-versions/$', GetFFVersions, name='get_ff_versions'),
 ]

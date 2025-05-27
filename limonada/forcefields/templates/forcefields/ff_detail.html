@@ -5,9 +5,29 @@
 {% block title %}Forcefields{% endblock %}
 
 {% block content %}
+<h1>Forcefields</h1>
+<br>
 
-  <h1>Forcefields</h1>
-  <br>
+<div class="row ml-3 mb-3">
+    <div class="row align-items-center">
+      <label class="font-weight-bold form-select">Versions</label>
+      <div class="ml-2 mr-2">
+        <select id="versions" name="versions" id="versions" class="custom-select">
+          {% for version in versions %}
+            <option value="{% url 'ffdetail' version.pk %}" {% if forcefield.pk == version.pk%}selected{% endif %} >{{ version.version }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if user.is_authenticated %}
+        {% if user == forcefield.curator %}
+          <form method="post" action="{% url 'ff-new-version' forcefield.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-primary" type="submit">Nouvelle Version</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
 
   <p class="font-italic m-0 pl-1"><span class="font-weight-bold">N.B.:</span> If you use the following files in your
       work, please cite the primary source. (see Description field)</p>
@@ -106,6 +126,12 @@
 {% block script %}
 
   <script>
+    window.addEventListener('load', (event) => {
+      document.getElementById('versions').addEventListener('change', (event) => {
+        window.location.href = event.target.value;
+      });
+    });
+
     $(document).ready(function(){
       $(".comments").scrollTop($(".comments")[0].scrollHeight);
     });

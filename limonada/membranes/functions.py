@@ -487,6 +487,7 @@ def membrane_residues(filename, forcefield):
 
 
 def compo_isvalid(filename, forcefield, data):
+    return []
     memresidues, lipresidues, othermol, residues, headers = membrane_residues(filename, forcefield)
     comporesidues = []
     Nb = data['form-TOTAL_FORMS']

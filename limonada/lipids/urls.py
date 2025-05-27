@@ -26,7 +26,7 @@ from django.views.decorators.cache import never_cache
 # local Django
 from .views import (GetSoftVersionList, GetFfList, GetLiIndex, GetLmClass, LipAutocomplete, LipCreate,
                     LipDelete, LipDetail, LipList, LipUpdate, TopAutocomplete, TopCreate, TopDelete,
-                    TopDetail, TopList, TopUpdate, APITopolList, APITopolDetails, APILipidList, APILipidDetails)
+                    TopDetail, TopList, TopUpdate, TopNewVersion)
 
 urlpatterns = [
     url(r'^lipids/$', LipList, name='liplist'),
@@ -45,4 +45,5 @@ urlpatterns = [
     url(r'^topologies/(?P<pk>\d+)/update/$', TopUpdate, name='topupdate'),
     url(r'^topologies/(?P<pk>\d+)/delete/$', TopDelete, name='topdelete'),
     url(r'^topology-autocomplete/$', TopAutocomplete.as_view(), name='topology-autocomplete'),
+    url(r'^topologies/(?P<pk>\d+)/new_version/$', TopNewVersion, name='top-new-version'),
 ]

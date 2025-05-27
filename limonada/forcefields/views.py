@@ -41,6 +41,9 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.db.models import Prefetch
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
+from django.db import IntegrityError, transaction
 
 # Django REST framework
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -58,7 +61,7 @@ from .serializers import FfListSerializer, FfDetailsSerialize
 @never_cache
 def FfList(request):
 
-    ff_list = Forcefield.objects.all().order_by('name')
+    ff_list = Forcefield.objects.all().filter(version=1).order_by('name')
 
     params = request.GET.copy()
 
@@ -164,8 +167,13 @@ def FfDetail(request, pk=None):
         else:
             form = FfCommentForm()
         comments = FfComment.objects.filter(forcefield=forcefield)
+        
+        
+        root = forcefield.root_version if forcefield.root_version else forcefield
+        versions = [root] + list(Forcefield.objects.filter(root_version=root).order_by('version').all())
+        
         return render(request, 'forcefields/ff_detail.html',
-                      {'forcefield': forcefield, 'comments': comments, 'form': form, 'forcefields': True})
+                      {'forcefield': forcefield, 'comments': comments, 'form': form, 'forcefields': True, 'versions': versions})
 
 
 @login_required
@@ -200,6 +208,18 @@ def FfCreate(request):
     return render(request, 'forcefields/ff_form.html',
                   {'form': form, 'forcefields': True, 'ffcreate': True, 'ffpath': ffpath, 'mdppath': mdppath})
 
+@require_POST
+@login_required
+@never_cache
+@transaction.atomic
+def FfNewVersion(request, pk=None):
+    if Forcefield.objects.filter(pk=pk).exists():
+        ff = Forcefield.objects.get(pk=pk)
+        if ff.curator != request.user:
+            return redirect('homepage')
+        
+        pk = ff.clone().pk
+        return redirect(reverse('ffdetail', args=[pk]))
 
 @login_required
 @never_cache

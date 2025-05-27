@@ -56,6 +56,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from django.http import JsonResponse
 
 # Django REST framework
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -310,7 +311,7 @@ def MemCreate(request, formset_class, template):
         file_data = {}
         file_data, mempath = FileData(request, 'mem_file', 'mempath', file_data)
         file_data, otherpath = FileData(request, 'other_file', 'otherpath', file_data)
-        ffid = simplejson.loads(request.POST.get('forcefield', None))
+        ffid = simplejson.loads(request.POST.get('version', None))
         forcefield = Forcefield.objects.filter(id=ffid)
         softabb = forcefield[0].software.all()[0].abbreviation
         if os.path.isfile(os.path.join(settings.MEDIA_ROOT, mempath)):
@@ -554,7 +555,7 @@ def MemUpdate(request, pk=None):
             mempath = ''
             file_data, mempath = FileData(request, 'mem_file', 'mempath', file_data)
             softabb = mt.forcefield.software.all()[0].abbreviation
-            ffid = simplejson.loads(request.POST.get('forcefield', None))
+            ffid = simplejson.loads(request.POST.get('version', None))
             forcefield = Forcefield.objects.filter(id=ffid)
             if os.path.isfile(os.path.join(settings.MEDIA_ROOT, mempath)):
                 extension = os.path.splitext(mempath)[1]
@@ -889,6 +890,22 @@ class MembraneAutocomplete(autocomplete.Select2QuerySetView):
             qs = qs.filter(name__icontains=self.q)
         return qs
 
+
+def GetFFVersions(request):
+    ff_id = request.GET.get('ff_id')
+    versions = []
+    
+    if ff_id:
+        try:
+            versions = [
+                {'value': v.pk, 'text': v.version} 
+                for v in [Forcefield.objects.get(pk=ff_id)]+list(Forcefield.objects.filter(root_version=ff_id))
+            ]
+            
+        except Forcefield.DoesNotExist:
+            pass
+    
+    return JsonResponse({'versions': versions})
 
 def GetLipTops(request):
     lipid_id = request.GET['lip']

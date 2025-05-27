@@ -49,6 +49,7 @@ from django.shortcuts import redirect, render
 from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView
+from django.views.decorators.http import require_POST
 
 # Django REST framework
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -173,7 +174,7 @@ def GetFfList(request):
     elif type(softlist) is str:
         softlist = softlist.split(",")
     op = request.POST.get('operator', None)
-    ff_list = Forcefield.objects.all()
+    ff_list = Forcefield.objects.all().filter(version=1)
     if op == 'AND':
         software = Software.objects.filter(id=softlist[0]).values_list('abbreviation', flat=True)[0][:2]
     else:
@@ -199,6 +200,19 @@ def GetFfList(request):
             data.append({'value': ff.id, 'name': ff.name})
     return HttpResponse(simplejson.dumps(data), content_type='application/json')
 
+
+@login_required
+@never_cache
+@transaction.atomic
+@require_POST
+def TopNewVersion(request, pk=None):
+    if Topology.objects.filter(pk=pk).exists():
+        top = Topology.objects.get(pk=pk)
+        if top.curator != request.user:
+            return redirect('homepage')
+        
+        pk = top.clone().pk
+        return redirect(reverse('topdetail', args=[pk]))
 
 @never_cache
 def LipList(request):
@@ -447,8 +461,8 @@ class LipDetail(DetailView):
         context_data = super(LipDetail, self).get_context_data(**kwargs)
         context_data['lipids'] = True
         context_data['tops'] = Topology.objects.filter(lipid=Lipid.objects.get(slug=slug))
+        
         return context_data
-
 
 @login_required
 def LipDelete(request, slug=None):
@@ -496,7 +510,7 @@ def TopList(request):
 
     lmclass, lmdict = lm_class()
 
-    top_list = Topology.objects.all().order_by('forcefield', 'lipid__lmid')
+    top_list = Topology.objects.all().filter(t_version=1).order_by('forcefield', 'lipid__lmid')
 
     params = request.GET.copy()
 
@@ -641,8 +655,13 @@ def TopDetail(request, pk=None):
         else:
             form = TopCommentForm()
         comments = TopComment.objects.filter(topology=topology)
-        return render(request, 'lipids/top_detail.html',
-                      {'topology': topology, 'comments': comments, 'form': form, 'cgbonds': bonds, 'topologies': True})
+        
+        root = topology.root_version if topology.root_version else topology
+        versions = [root] + list(Topology.objects.filter(root_version=root).order_by('t_version').all())
+        
+        return render(request, 'lipids/top_detail.html', {
+            'topology': topology, 'comments': comments, 'form': form, 'cgbonds': bonds, 'topologies': True, 'versions': versions
+        })
 
 
 @login_required
