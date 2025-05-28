@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='membranetopol',
             name='root_version',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='membranes.MembraneTopol'),
+            field=models.ForeignKey(null=True, blank=True, on_delete=django.db.models.deletion.DO_NOTHING, to='membranes.MembraneTopol'),
         ),
         migrations.AddField(
             model_name='membranetopol',

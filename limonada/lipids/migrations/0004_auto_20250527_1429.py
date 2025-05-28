@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='topology',
             name='root_version',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='lipids.Topology'),
+            field=models.ForeignKey(null=True, blank=True, on_delete=django.db.models.deletion.DO_NOTHING, to='lipids.Topology'),
         ),
         migrations.AddField(
             model_name='topology',

@@ -306,7 +306,7 @@ class Topology(models.Model):
     curator = models.ForeignKey(User, on_delete=models.CASCADE)
     
     t_version = models.IntegerField(default=1)
-    root_version = models.ForeignKey('lipids.Topology', null=True, on_delete=models.DO_NOTHING)
+    root_version = models.ForeignKey('lipids.Topology', null=True, blank=True, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return '%s_%s' % (self.lipid.name, self.version)
