@@ -108,7 +108,7 @@ class Forcefield(models.Model):
     date = models.DateField(auto_now=True)
     
     version = models.IntegerField(default=1)
-    root_version = models.ForeignKey('forcefields.Forcefield', null=True, on_delete=models.DO_NOTHING)
+    root_version = models.ForeignKey('forcefields.Forcefield', blank=True, null=True, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.name

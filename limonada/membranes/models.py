@@ -123,7 +123,7 @@ class MembraneTopol(models.Model):
                                  blank=True)
     
     version = models.IntegerField(default=1)
-    root_version = models.ForeignKey('membranes.MembraneTopol', null=True, on_delete=models.DO_NOTHING)
+    root_version = models.ForeignKey('membranes.MembraneTopol', blank=True, null=True, on_delete=models.DO_NOTHING)
     
     @property
     def tags(self):
